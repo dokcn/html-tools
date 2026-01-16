@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>U8g2 绘图模拟器 (128x64)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        /* 确保 Inter 字体可用 */
+        body { font-family: 'Inter', sans-serif; }
+        
+        /* 1. 输入控件样式 */
+        .input-group {
+            @apply flex flex-col space-y-1 mb-4;
+        }
+        .input-group label {
+            @apply text-sm font-medium text-gray-300;
+        }
+        .input-group input[type="number"], .input-group input[type="text"],
+        .input-group select {
+            background-color: #374151;
+            color: #ffffff;
+            border: 1px solid #4b5563;
+            padding: 8px;
+            border-radius: 6px;
+            transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+        }
+        .input-group input:focus, .input-group select:focus {
+            outline: none;
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.5);
+        }
+        .param-row {
+            @apply grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4;
+        }
+
+        /* 2. 屏幕显示和索引容器 */
+        .display-wrapper {
+            display: grid;
+            grid-template-columns: 3rem 1fr; /* 左侧留出 3rem 给 Y 轴索引 */
+            grid-template-rows: 1fr auto;
+            max-width: 800px; /* 放大显示区域 */
+            margin: 0 auto;
+        }
+
+        /* 模拟 OLED 屏幕的容器，用于设置固定宽高比 */
+        .screen-container {
+            grid-column: 2 / 3;
+            grid-row: 1 / 2;
+            width: 100%;
+            aspect-ratio: 2 / 1; 
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 2px;
+            border-radius: 6px;
+            background-color: #0d0d0d;
+            box-shadow: 0 0 20px rgba(0,192,255,0.7);
+        }
+        
+        /* Canvas 本身用于绘图 */
+        #u8g2-canvas {
+            image-rendering: pixelated; 
+            border: 1px solid #1f2937;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* Y 轴索引容器 (左侧) */
+        #y-indices-container {
+            grid-column: 1 / 2;
+            grid-row: 1 / 2;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            align-items: flex-end;
+            padding: 2px 5px 2px 0;
+            font-size: 0.5rem; 
+            color: #4b5563; 
+        }
+        /* X 轴索引容器 (下方) */
+        #x-indices-container {
+            grid-column: 2 / 3;
+            grid-row: 2 / 3;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            padding: 5px 0 0 0;
+            font-size: 0.5rem;
+            color: #4b5563;
+        }
+        /* 索引标签样式 */
+        .index-label {
+            position: absolute; 
+            transform: translateX(-50%);
+        }
+        .y-index-label {
+            position: relative;
+            height: 1.5%; 
+            text-align: right;
+            line-height: 1;
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-white min-h-screen p-4 sm:p-8">
+
+    <h1 class="text-3xl font-bold mb-6 text-center text-blue-400">U8g2 绘图函数模拟器 (128x64)</h1>
+    <p class="text-center text-gray-400 mb-8">在左侧选择函数并输入参数，右侧屏幕将实时更新。</p>
+
+    <div class="flex flex-col md:flex-row gap-8 max-w-7xl mx-auto">
+        
+        <!-- 左侧：控制面板 -->
+        <div class="md:w-1/2 lg:w-2/5 p-6 bg-gray-800 rounded-xl shadow-lg h-fit">
+            <h2 class="text-xl font-semibold mb-4 border-b border-gray-700 pb-2">1. 配置新图形</h2>
+
+            <!-- 1. 函数选择 -->
+            <div class="input-group">
+                <label for="function-select">选择函数 (u8g2_Draw...)</label>
+                <select id="function-select" class="w-full">
+                    <option value="DrawBox">DrawBox(x, y, w, h) - 填充矩形</option>
+                    <option value="DrawFrame">DrawFrame(x, y, w, h) - 矩形边框</option>
+                    <option value="DrawLine">DrawLine(x1, y1, x2, y2)</option>
+                    <option value="DrawPixel">DrawPixel(x, y)</option>
+                    <option value="DrawStr">DrawStr(x, y, text)</option>
+                    <option value="DrawCircle">DrawCircle(x0, y0, r, option) - 空心圆</option>
+                    <option value="DrawDisc">DrawDisc(x0, y0, r, option) - 实心圆</option>
+                </select>
+            </div>
+
+            <!-- 2. 参数输入区 (动态生成) -->
+            <div id="parameter-inputs" class="space-y-4">
+                <!-- 参数将由 JavaScript 插入这里 -->
+            </div>
+            
+            <!-- 3. 添加按钮 -->
+            <button id="add-item-btn" class="w-full py-2 bg-green-600 rounded-md font-semibold hover:bg-green-700 transition duration-150 shadow-lg">
+                <span id="add-btn-text">添加到列表</span>
+            </button>
+
+
+            <h2 class="text-xl font-semibold mt-8 mb-4 border-b border-gray-700 pb-2">2. 已绘制列表</h2>
+            
+            <button id="clear-list-btn" class="w-full mb-4 py-2 bg-red-600 rounded-md font-semibold hover:bg-red-700 transition duration-150 shadow-lg text-sm">
+                清空列表
+            </button>
+
+            <!-- 4. 列表展示区 -->
+            <div id="drawing-list-container" class="space-y-2 text-sm">
+                <!-- 列表项将由 JavaScript 插入这里 -->
+                <p class="text-gray-400 text-center" id="empty-list-message">列表为空，请在上方添加图形。</p>
+            </div>
+
+
+            <div class="mt-6 pt-4 border-t border-gray-700">
+                 <p class="text-sm text-yellow-400">⚠️ 提示: 模拟器使用了 Canvas，与实际 U8g2 库的字体和抗锯齿效果可能不完全一致，仅用于辅助布局。</p>
+            </div>
+        </div>
+
+        <!-- 右侧：模拟显示屏及索引 -->
+        <div class="md:w-1/2 lg:w-3/5">
+            <h2 class="text-xl font-semibold mb-4 text-center">128x64 OLED 模拟屏</h2>
+            
+            <!-- 新的显示布局容器 -->
+            <div class="display-wrapper">
+                
+                <!-- Y 轴索引 (左侧) -->
+                <div id="y-indices-container">
+                    <!-- 索引标签将通过 JS 动态生成 -->
+                </div>
+                
+                <!-- Canvas 屏幕本身 -->
+                <div class="screen-container">
+                    <canvas id="u8g2-canvas" width="128" height="64"></canvas>
+                </div>
+                
+                <!-- X 轴索引 (下方) -->
+                <div id="x-indices-container">
+                    <!-- 索引标签将通过 JS 动态生成 -->
+                </div>
+
+            </div>
+            <p class="text-center text-xs mt-2 text-gray-500">分辨率: 128 x 64 像素</p>
+        </div>
+    </div>
+
+    <script>
+        // --- 全局配置 ---
+        const CANVAS_WIDTH = 128;
+        const CANVAS_HEIGHT = 64;
+        
+        // 获取 DOM 元素
+        const canvas = document.getElementById('u8g2-canvas');
+        const ctx = canvas.getContext('2d');
+        const functionSelect = document.getElementById('function-select');
+        const paramInputsContainer = document.getElementById('parameter-inputs');
+        const xIndicesContainer = document.getElementById('x-indices-container');
+        const yIndicesContainer = document.getElementById('y-indices-container');
+        const drawingListContainer = document.getElementById('drawing-list-container');
+        const addItemBtn = document.getElementById('add-item-btn');
+        const clearListBtn = document.getElementById('clear-list-btn');
+
+        // 默认参数值
+        const defaults = {
+            x: 10, y: 10, w: 50, h: 20, 
+            x1: 0, y1: 0, x2: 127, y2: 63,
+            r: 20, x0: 64, y0: 32,
+            text: "Hello U8g2",
+            option: 3
+        };
+
+        // 当前状态
+        let currentFunction = functionSelect.value;
+        // 存储当前输入框中的参数值（用于添加新项目）
+        let currentParams = JSON.parse(JSON.stringify(defaults)); 
+        // 存储所有要绘制的图形列表
+        let drawingList = []; 
+
+        // --- 绘图函数配置 (定义每个函数所需的参数) ---
+        const functionConfigs = {
+            DrawBox: {
+                label: "u8g2_DrawBox",
+                params: [
+                    { name: 'x', type: 'number', min: 0, max: CANVAS_WIDTH - 1, step: 1, label: 'X 坐标' },
+                    { name: 'y', type: 'number', min: 0, max: CANVAS_HEIGHT - 1, step: 1, label: 'Y 坐标' },
+                    { name: 'w', type: 'number', min: 1, max: CANVAS_WIDTH, step: 1, label: '宽度 (W)' },
+                    { name: 'h', type: 'number', min: 1, max: CANVAS_HEIGHT, step: 1, label: '高度 (H)' }
+                ]
+            },
+            DrawFrame: {
+                label: "u8g2_DrawFrame",
+                params: [
+                    { name: 'x', type: 'number', min: 0, max: CANVAS_WIDTH - 1, step: 1, label: 'X 坐标' },
+                    { name: 'y', type: 'number', min: 0, max: CANVAS_HEIGHT - 1, step: 1, label: 'Y 坐标' },
+                    { name: 'w', type: 'number', min: 1, max: CANVAS_WIDTH, step: 1, label: '宽度 (W)' },
+                    { name: 'h', type: 'number', min: 1, max: CANVAS_HEIGHT, step: 1, label: '高度 (H)' }
+                ]
+            },
+            DrawLine: {
+                label: "u8g2_DrawLine",
+                params: [
+                    { name: 'x1', type: 'number', min: 0, max: CANVAS_WIDTH - 1, step: 1, label: 'X1' },
+                    { name: 'y1', type: 'number', min: 0, max: CANVAS_HEIGHT - 1, step: 1, label: 'Y1' },
+                    { name: 'x2', type: 'number', min: 0, max: CANVAS_WIDTH - 1, step: 1, label: 'X2' },
+                    { name: 'y2', type: 'number', min: 0, max: CANVAS_HEIGHT - 1, step: 1, label: 'Y2' }
+                ]
+            },
+            DrawPixel: {
+                label: "u8g2_DrawPixel",
+                params: [
+                    { name: 'x', type: 'number', min: 0, max: CANVAS_WIDTH - 1, step: 1, label: 'X 坐标' },
+                    { name: 'y', type: 'number', min: 0, max: CANVAS_HEIGHT - 1, step: 1, label: 'Y 坐标' }
+                ]
+            },
+            DrawStr: {
+                label: "u8g2_DrawStr",
+                params: [
+                    { name: 'x', type: 'number', min: 0, max: CANVAS_WIDTH - 1, step: 1, label: 'X 坐标' },
+                    { name: 'y', type: 'number', min: 0, max: CANVAS_HEIGHT - 1, step: 1, label: 'Y 坐标 (基线)' },
+                    { name: 'text', type: 'text', label: '文本 (Text)' }
+                ]
+            },
+            DrawCircle: {
+                label: "u8g2_DrawCircle",
+                params: [
+                    { name: 'x0', type: 'number', min: 0, max: CANVAS_WIDTH - 1, step: 1, label: '中心 X0' },
+                    { name: 'y0', type: 'number', min: 0, max: CANVAS_HEIGHT - 1, step: 1, label: '中心 Y0' },
+                    { name: 'r', type: 'number', min: 1, max: Math.max(CANVAS_WIDTH, CANVAS_HEIGHT) / 2, step: 1, label: '半径 (R)' },
+                    { name: 'option', type: 'number', min: 0, max: 15, step: 1, label: '象限 (Option 0-15)' }
+                ]
+            },
+            DrawDisc: {
+                label: "u8g2_DrawDisc",
+                params: [
+                    { name: 'x0', type: 'number', min: 0, max: CANVAS_WIDTH - 1, step: 1, label: '中心 X0' },
+                    { name: 'y0', type: 'number', min: 0, max: CANVAS_HEIGHT - 1, step: 1, label: '中心 Y0' },
+                    { name: 'r', type: 'number', min: 1, max: Math.max(CANVAS_WIDTH, CANVAS_HEIGHT) / 2, step: 1, label: '半径 (R)' },
+                    { name: 'option', type: 'number', min: 0, max: 15, step: 1, label: '象限 (Option 0-15)' }
+                ]
+            }
+        };
+
+        // --- 模拟 U8g2 绘图函数 (使用 Canvas API) ---
+        // (保持 DrawBox, DrawFrame, DrawLine, DrawPixel, DrawStr, DrawCircle, DrawDisc 不变)
+
+        function clearBuffer() {
+            ctx.fillStyle = 'black';
+            ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+        }
+
+        function simulatedDrawBox(x, y, w, h) {
+            ctx.fillStyle = 'white';
+            ctx.fillRect(x, y, w, h);
+        }
+        
+        function simulatedDrawFrame(x, y, w, h) {
+            ctx.strokeStyle = 'white';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1); 
+        }
+
+        function simulatedDrawLine(x1, y1, x2, y2) {
+            ctx.strokeStyle = 'white';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(x1 + 0.5, y1 + 0.5); 
+            ctx.lineTo(x2 + 0.5, y2 + 0.5);
+            ctx.stroke();
+        }
+        
+        function simulatedDrawPixel(x, y) {
+            ctx.fillStyle = 'white';
+            ctx.fillRect(x, y, 1, 1);
+        }
+
+        function simulatedDrawStr(x, y, text) {
+            ctx.fillStyle = 'white';
+            ctx.font = '8px monospace'; 
+            ctx.textBaseline = 'alphabetic'; 
+            ctx.fillText(text, x, y);
+        }
+        
+        function simulatedDrawCircle(x0, y0, r, option) {
+            ctx.strokeStyle = 'white';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.arc(x0 + 0.5, y0 + 0.5, r, 0, 2 * Math.PI);
+            ctx.stroke();
+        }
+        
+        function simulatedDrawDisc(x0, y0, r, option) {
+            ctx.fillStyle = 'white';
+            ctx.beginPath();
+            ctx.arc(x0 + 0.5, y0 + 0.5, r, 0, 2 * Math.PI);
+            ctx.fill();
+        }
+
+        // 映射函数名称到模拟函数
+        const drawFunctions = {
+            DrawBox: simulatedDrawBox,
+            DrawFrame: simulatedDrawFrame,
+            DrawLine: simulatedDrawLine,
+            DrawPixel: simulatedDrawPixel,
+            DrawStr: simulatedDrawStr,
+            DrawCircle: simulatedDrawCircle,
+            DrawDisc: simulatedDrawDisc,
+        };
+
+
+        // --- 列表管理和渲染逻辑 ---
+
+        /**
+         * 动态生成 X 轴 (列) 索引
+         */
+        function drawXIndices() {
+            xIndicesContainer.innerHTML = '';
+            
+            // X轴索引：每隔16像素显示一次 (0, 16, 32, 48, 64, 80, 96, 112, 127)
+            const indicesToShow = [];
+            const stepX = 16; 
+            for (let i = 0; i < CANVAS_WIDTH; i += stepX) {
+                indicesToShow.push(i);
+            }
+            if (indicesToShow[indicesToShow.length - 1] !== CANVAS_WIDTH - 1) {
+                indicesToShow.push(CANVAS_WIDTH - 1);
+            }
+
+            const canvasWidth = canvas.clientWidth;
+
+            indicesToShow.forEach(index => {
+                const label = document.createElement('span');
+                label.textContent = index;
+                label.classList.add('index-label');
+                
+                const position = (index / (CANVAS_WIDTH - 1)) * canvasWidth;
+                
+                label.style.left = `${(index / (CANVAS_WIDTH - 1)) * 100}%`;
+                label.style.position = 'absolute';
+                label.style.transform = 'translateX(-50%)'; 
+                
+                xIndicesContainer.appendChild(label);
+            });
+            xIndicesContainer.style.position = 'relative';
+            xIndicesContainer.style.height = '1rem';
+        }
+
+        /**
+         * 动态生成 Y 轴 (行) 索引
+         */
+        function drawYIndices() {
+            yIndicesContainer.innerHTML = '';
+            
+            // Y轴索引：每隔8像素显示一次 (0, 8, 16, 24, 32, 40, 48, 56, 63)
+            const indicesToShow = [];
+            const stepY = 8;
+            for (let i = 0; i < CANVAS_HEIGHT; i += stepY) {
+                indicesToShow.push(i);
+            }
+            if (indicesToShow[indicesToShow.length - 1] !== CANVAS_HEIGHT - 1) {
+                indicesToShow.push(CANVAS_HEIGHT - 1);
+            }
+            
+            yIndicesContainer.style.height = '100%';
+            yIndicesContainer.style.display = 'flex';
+            yIndicesContainer.style.flexDirection = 'column';
+            yIndicesContainer.style.justifyContent = 'space-between';
+            yIndicesContainer.style.paddingTop = '0';
+            yIndicesContainer.style.paddingBottom = '0';
+
+            const numIndices = CANVAS_HEIGHT; 
+            
+            for (let i = 0; i < numIndices; i++) {
+                // 检查当前行 i 是否在需要显示的索引列表中
+                const isKeyIndex = indicesToShow.includes(i);
+                
+                const label = document.createElement('span');
+                label.classList.add('y-index-label');
+                
+                if (isKeyIndex) {
+                    label.textContent = i;
+                    label.style.color = 'white'; 
+                } else {
+                    label.textContent = '';
+                }
+                
+                label.style.height = `calc(100% / ${numIndices})`; 
+                
+                yIndicesContainer.appendChild(label);
+            }
+        }
+
+        /**
+         * 主渲染逻辑：遍历列表并绘制所有图形，并在最后绘制当前配置的预览图形
+         */
+        function redraw() {
+            clearBuffer();
+
+            // 1. 绘制已保存的列表项目
+            drawingList.forEach(item => {
+                const func = drawFunctions[item.type];
+                if (func) {
+                    const config = functionConfigs[item.type];
+                    // 获取参数值，并确保数字类型正确解析
+                    const args = config.params.map(p => {
+                        const value = item.params[p.name];
+                        return p.type === 'number' ? parseFloat(value) : value;
+                    });
+                    func(...args);
+                }
+            });
+            
+            // 2. 绘制当前正在配置的图形作为预览 (使用 currentFunction 和 currentParams)
+            const previewFunc = drawFunctions[currentFunction];
+            if (previewFunc) {
+                const config = functionConfigs[currentFunction];
+                const previewArgs = config.params.map(p => {
+                    const value = currentParams[p.name];
+                    return p.type === 'number' ? parseFloat(value) : value;
+                });
+                previewFunc(...previewArgs);
+            }
+        }
+        
+        /**
+         * 渲染图形列表 UI
+         */
+        function renderDrawingList() {
+            drawingListContainer.innerHTML = '';
+            
+            if (drawingList.length === 0) {
+                drawingListContainer.innerHTML = '<p class="text-gray-400 text-center" id="empty-list-message">列表为空，请在上方添加图形。</p>';
+                return;
+            }
+
+            drawingList.forEach((item, index) => {
+                const itemEl = document.createElement('div');
+                itemEl.className = 'flex justify-between items-center p-2 bg-gray-700 rounded-md';
+                
+                // 1. 描述文本
+                const description = document.createElement('span');
+                let paramSummary = Object.entries(item.params)
+                    .map(([key, value]) => `${key}: ${value}`)
+                    .join(', ');
+                
+                description.textContent = `${index + 1}. ${item.type}(${paramSummary})`;
+                description.className = 'truncate pr-2';
+
+                // 2. 删除按钮
+                const deleteBtn = document.createElement('button');
+                deleteBtn.textContent = '删除';
+                deleteBtn.className = 'flex-shrink-0 px-3 py-1 bg-red-500 hover:bg-red-600 rounded-md text-xs font-medium transition';
+                deleteBtn.onclick = () => handleDeleteItem(index);
+
+                itemEl.appendChild(description);
+                itemEl.appendChild(deleteBtn);
+                drawingListContainer.appendChild(itemEl);
+            });
+        }
+
+        /**
+         * 处理添加到列表的逻辑
+         */
+        function handleAddItem() {
+            // 创建一个新的图形对象副本并添加到列表中
+            const newItem = {
+                type: currentFunction,
+                params: JSON.parse(JSON.stringify(currentParams)) // 深拷贝当前参数
+            };
+            drawingList.push(newItem);
+            
+            // 重新渲染列表和 Canvas
+            renderDrawingList();
+            redraw(); // 确保列表更新后屏幕刷新
+        }
+        
+        /**
+         * 处理删除列表项的逻辑
+         */
+        function handleDeleteItem(index) {
+            drawingList.splice(index, 1);
+            
+            // 重新渲染列表和 Canvas
+            renderDrawingList();
+            redraw();
+        }
+        
+        /**
+         * 处理清空列表的逻辑
+         */
+        function handleClearList() {
+            if (drawingList.length > 0) {
+                // 使用自定义模态框替代 alert/confirm
+                const isConfirmed = window.confirm("确定要清空所有已绘制的图形吗？");
+                if (isConfirmed) {
+                    drawingList = [];
+                    renderDrawingList();
+                    redraw();
+                }
+            }
+        }
+
+
+        // --- 参数输入 UI 更新和事件处理 (针对 currentParams) ---
+
+        /**
+         * 根据当前选择的函数动态生成参数输入框
+         */
+        function updateParameterInputs() {
+            const config = functionConfigs[currentFunction];
+            if (!config) return;
+
+            paramInputsContainer.innerHTML = '';
+            
+            const paramRow = document.createElement('div');
+            paramRow.className = 'param-row';
+
+            config.params.forEach(p => {
+                const div = document.createElement('div');
+                div.className = 'input-group';
+                
+                const label = document.createElement('label');
+                label.setAttribute('for', p.name);
+                label.textContent = `${p.label} (${p.name})`;
+                
+                const input = document.createElement('input');
+                input.id = p.name;
+                input.name = p.name;
+                input.type = p.type;
+                // 使用 currentParams 初始化输入值
+                input.value = currentParams[p.name] !== undefined ? currentParams[p.name] : defaults[p.name];
+                
+                if (p.type === 'number' || p.type === 'text') {
+                    input.classList.add('w-full'); 
+                }
+
+                if (p.type === 'number') {
+                    input.setAttribute('min', p.min);
+                    input.setAttribute('max', p.max);
+                    input.setAttribute('step', p.step);
+                }
+                
+                // 输入事件监听：更新 currentParams 并调用 redraw() 实现实时预览
+                input.addEventListener('input', (e) => {
+                    const val = p.type === 'number' ? (e.target.value === '' ? defaults[p.name] : e.target.value) : e.target.value;
+                    currentParams[p.name] = p.type === 'number' ? parseFloat(val) : val;
+                    redraw(); // 实时预览！
+                });
+
+                div.appendChild(label);
+                div.appendChild(input);
+                paramRow.appendChild(div);
+            });
+            
+            paramInputsContainer.appendChild(paramRow);
+        }
+
+        function handleFunctionChange(e) {
+            currentFunction = e.target.value;
+            const newConfig = functionConfigs[currentFunction];
+            
+            // 重置 currentParams 以匹配新函数所需的参数，或使用默认值
+            currentParams = {}; 
+            newConfig.params.forEach(p => {
+                 currentParams[p.name] = defaults[p.name];
+            });
+            
+            updateParameterInputs();
+            redraw(); // 切换函数后立即显示默认图形的预览
+        }
+        
+        function handleResize() {
+            drawXIndices(); 
+        }
+
+        // --- 初始化 ---
+        function init() {
+            functionSelect.addEventListener('change', handleFunctionChange);
+            addItemBtn.addEventListener('click', handleAddItem);
+            clearListBtn.addEventListener('click', handleClearList);
+
+            // 初始设置 DrawBox
+            updateParameterInputs();
+            
+            // 初始绘制
+            redraw();
+            renderDrawingList();
+            
+            // 绘制坐标轴索引
+            drawYIndices();
+            drawXIndices();
+            window.addEventListener('resize', handleResize);
+        }
+
+        window.onload = init;
+
+    </script>
+</body>
+</html>

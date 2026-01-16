@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Greek Dashboard | Dark Mode</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --card-bg: rgba(30, 41, 59, 0.4);
+            --card-border: rgba(255, 255, 255, 0.05);
+            --text-primary: #f8fafc;
+            --text-secondary: #64748b;
+            --accent-glow: #38bdf8; 
+            --accent-gradient: linear-gradient(135deg, #60a5fa, #38bdf8);
+        }
+
+        html, body {
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-color);
+            background-image: radial-gradient(circle at 50% 50%, rgba(56, 189, 248, 0.05) 0%, transparent 50%);
+            color: var(--text-primary);
+            display: flex;
+            flex-direction: column;
+        }
+
+        header {
+            height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 2rem;
+            background: rgba(15, 23, 42, 0.9);
+            border-bottom: 1px solid var(--card-border);
+            flex-shrink: 0;
+        }
+
+        h1 {
+            font-size: 1.2rem;
+            margin: 0;
+            background: linear-gradient(to right, #fff, #94a3b8);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .subtitle {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .grid-container {
+            flex-grow: 1;
+            padding: 10px;
+            display: grid;
+            grid-template-columns: repeat(6, 1fr);
+            grid-template-rows: repeat(4, 1fr); 
+            gap: 10px;
+            box-sizing: border-box;
+            height: calc(100vh - 60px);
+        }
+
+        .card {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 12px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            position: relative;
+            transition: all 0.2s ease;
+            user-select: none;
+        }
+
+        .card:hover {
+            background: rgba(56, 189, 248, 0.1);
+            border-color: rgba(56, 189, 248, 0.3);
+            transform: scale(1.02);
+            box-shadow: 0 0 15px rgba(56, 189, 248, 0.15);
+            z-index: 10;
+        }
+
+        .card:active {
+            transform: scale(0.95);
+        }
+
+        .symbol {
+            font-family: 'Times New Roman', serif;
+            font-size: 4vmin; 
+            margin-bottom: 0.5vmin;
+            background: var(--accent-gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            filter: drop-shadow(0 0 5px rgba(56,189,248,0.3));
+        }
+
+        .name {
+            font-size: 1.8vmin;
+            font-weight: 600;
+        }
+
+        .sound {
+            font-size: 1.2vmin;
+            color: var(--text-secondary);
+            margin-top: 2px;
+        }
+
+        @media (max-width: 1024px) {
+            .grid-container {
+                grid-template-columns: repeat(4, 1fr);
+                grid-template-rows: repeat(6, 1fr);
+            }
+            .symbol { font-size: 5vmin; }
+            .name { font-size: 2.2vmin; }
+        }
+
+        @media (max-width: 600px) {
+            .grid-container {
+                grid-template-columns: repeat(3, 1fr);
+                grid-template-rows: repeat(8, 1fr);
+            }
+            .symbol { font-size: 6vmin; }
+            .name { font-size: 3vmin; }
+            .sound { display: none; }
+        }
+
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>Greek Alphabet</h1>
+    </header>
+
+    <div class="grid-container" id="grid"></div>
+
+    <script>
+        const alphabet = [
+            { n: "Alpha", s: "Α α", p: "AL-fah" },
+            { n: "Beta", s: "Β β", p: "BAY-tah" },
+            { n: "Gamma", s: "Γ γ", p: "GAM-ah" },
+            { n: "Delta", s: "Δ δ", p: "DEL-tah" },
+            { n: "Epsilon", s: "Ε ε", p: "EP-si-lon" },
+            { n: "Zeta", s: "Ζ ζ", p: "ZAY-tah" },
+            { n: "Eta", s: "Η η", p: "AY-tah" },
+            { n: "Theta", s: "Θ θ", p: "THAY-tah" },
+            { n: "Iota", s: "Ι ι", p: "eye-OH-tah" },
+            { n: "Kappa", s: "Κ κ", p: "KAP-ah" },
+            { n: "Lambda", s: "Λ λ", p: "LAM-dah" },
+            { n: "Mu", s: "Μ μ", p: "MYOO" },
+            { n: "Nu", s: "Ν ν", p: "NOO" },
+            { n: "Xi", s: "Ξ ξ", p: "ZYE" },
+            { n: "Omicron", s: "Ο ο", p: "OM-i-kron" },
+            { n: "Pi", s: "Π π", p: "PIE" },
+            { n: "Rho", s: "Ρ ρ", p: "ROW" },
+            { n: "Sigma", s: "Σ σ/ς", p: "SIG-mah" },
+            { n: "Tau", s: "Τ τ", p: "TOW" },
+            { n: "Upsilon", s: "Υ υ", p: "OOP-si-lon" },
+            { n: "Phi", s: "Φ φ", p: "FIE" },
+            { n: "Chi", s: "Χ χ", p: "KIE" },
+            { n: "Psi", s: "Ψ ψ", p: "SYE" },
+            { n: "Omega", s: "Ω ω", p: "oh-MAY-gah" }
+        ];
+
+        const grid = document.getElementById('grid');
+
+        function speak(text) {
+            // Cancel previous sound
+            window.speechSynthesis.cancel();
+            
+            const msg = new SpeechSynthesisUtterance(text);
+            
+            // --- FIX: FORCE ENGLISH VOICE ---
+            msg.lang = 'en-US'; 
+            msg.rate = 0.9; // Slightly slower for clarity
+            
+            window.speechSynthesis.speak(msg);
+        }
+
+        function init() {
+            grid.innerHTML = '';
+            alphabet.forEach(item => {
+                const card = document.createElement('div');
+                card.className = 'card';
+                card.innerHTML = `
+                    <div class="symbol">${item.s}</div>
+                    <div class="name">${item.n}</div>
+                    <div class="sound">${item.p}</div>
+                `;
+                
+                card.addEventListener('mousedown', () => speak(item.n));
+                card.addEventListener('touchstart', (e) => {
+                    e.preventDefault();
+                    speak(item.n);
+                });
+
+                grid.appendChild(card);
+            });
+        }
+
+        init();
+    </script>
+</body>
+</html>

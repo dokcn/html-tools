@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ElectroShift - 电子学单位换算中心</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&family=JetBrains+Mono:wght@400;700&display=swap');
+
+        :root {
+            --bg-color: #0a0a0c;
+            --accent-cyan: #06b6d4;
+            --accent-indigo: #6366f1;
+            --glass-bg: rgba(15, 15, 20, 0.7);
+            --glass-border: rgba(255, 255, 255, 0.1);
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: #e2e8f0;
+            font-family: 'Inter', sans-serif;
+            overflow-x: hidden;
+        }
+
+        .font-mono { font-family: 'JetBrains Mono', monospace; }
+
+        /* 霓虹背景光晕 */
+        .glow-overlay {
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            z-index: -1;
+        }
+        .glow-1 {
+            position: absolute;
+            top: -10%; left: -10%;
+            width: 50vw; height: 50vw;
+            background: radial-gradient(circle, rgba(6, 182, 212, 0.1) 0%, transparent 70%);
+            filter: blur(80px);
+        }
+        .glow-2 {
+            position: absolute;
+            bottom: -10%; right: -10%;
+            width: 50vw; height: 50vw;
+            background: radial-gradient(circle, rgba(99, 102, 241, 0.1) 0%, transparent 70%);
+            filter: blur(80px);
+        }
+
+        /* 毛玻璃卡片 */
+        .glass-card {
+            background: var(--glass-bg);
+            backdrop-filter: blur(16px);
+            border: 1px solid var(--glass-border);
+            border-radius: 1.5rem;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+        }
+
+        /* 隐藏输入框箭头 */
+        input::-webkit-outer-spin-button,
+        input::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        input[type=number] { -moz-appearance: textfield; }
+
+        /* 选项卡动画 */
+        .tab-content { display: none; }
+        .tab-content.active { display: block; animation: fadeIn 0.4s ease-out; }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .neon-border-focus:focus-within {
+            border-color: var(--accent-cyan);
+            box-shadow: 0 0 15px rgba(6, 182, 212, 0.3);
+        }
+    </style>
+</head>
+<body>
+    <div class="glow-overlay">
+        <div class="glow-1"></div>
+        <div class="glow-2"></div>
+    </div>
+
+    <div class="relative max-w-5xl mx-auto px-4 py-12">
+        <!-- Header -->
+        <header class="mb-12 text-center">
+            <div class="inline-flex items-center gap-2 bg-white/5 border border-white/10 px-4 py-1.5 rounded-full mb-6 text-xs font-semibold tracking-widest text-cyan-400 uppercase">
+                <i data-lucide="zap" class="w-4 h-4 animate-pulse"></i>
+                Electronics Engineering Hub
+            </div>
+            <h1 class="text-5xl md:text-6xl font-extrabold text-white mb-4 tracking-tighter">
+                Electro<span class="text-cyan-500">Shift</span>
+            </h1>
+            <p class="text-slate-400 max-w-xl mx-auto text-sm md:text-base">
+                精密电子学单位换算器与物理计算工具，助力高效电路设计。
+            </p>
+        </header>
+
+        <!-- Tab Navigation -->
+        <div class="flex justify-center mb-10 p-1.5 bg-slate-900/80 rounded-2xl border border-white/5 w-fit mx-auto backdrop-blur-md">
+            <button onclick="switchTab('converter')" id="btn-converter" class="tab-btn flex items-center gap-2 px-6 py-2.5 rounded-xl transition-all font-bold text-white bg-cyan-600 shadow-lg shadow-cyan-900/20">
+                <i data-lucide="arrow-right-left" class="w-4 h-4"></i>
+                单位换算
+            </button>
+            <button onclick="switchTab('ohms-law')" id="btn-ohms-law" class="tab-btn flex items-center gap-2 px-6 py-2.5 rounded-xl transition-all font-bold text-slate-500 hover:text-white">
+                <i data-lucide="calculator" class="w-4 h-4"></i>
+                欧姆定律
+            </button>
+        </div>
+
+        <!-- Section: Converter -->
+        <div id="converter" class="tab-content active">
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                <!-- Parameters -->
+                <div class="glass-card p-8 lg:col-span-1">
+                    <h3 class="text-lg font-bold text-white mb-6 flex items-center gap-2 uppercase tracking-wider">
+                        <i data-lucide="settings" class="w-5 h-5 text-cyan-400"></i>
+                        参数选择
+                    </h3>
+                    <div class="space-y-6">
+                        <div>
+                            <label class="text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em] mb-2 block">物理量类型</label>
+                            <select id="unit-type" onchange="initConverter()" class="w-full bg-slate-800/50 border border-slate-700 text-white px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-cyan-500/50 appearance-none cursor-pointer font-semibold">
+                                <option value="voltage">电压 (Voltage)</option>
+                                <option value="current">电流 (Current)</option>
+                                <option value="resistance">电阻 (Resistance)</option>
+                                <option value="power">功率 (Power)</option>
+                                <option value="capacitance">电容 (Capacitance)</option>
+                                <option value="inductance">电感 (Inductance)</option>
+                                <option value="frequency">频率 (Frequency)</option>
+                            </select>
+                        </div>
+                        <div class="p-5 rounded-2xl bg-cyan-500/5 border border-cyan-500/10 flex items-center gap-4">
+                            <div id="unit-icon" class="p-3 bg-cyan-500/10 rounded-xl text-cyan-400">
+                                <i data-lucide="zap"></i>
+                            </div>
+                            <div>
+                                <div class="text-[10px] text-cyan-400 font-bold uppercase tracking-widest">基准单位</div>
+                                <div id="base-unit-display" class="text-2xl font-black text-white">V</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Display -->
+                <div class="glass-card p-8 lg:col-span-2 relative overflow-hidden flex flex-col justify-between">
+                    <div class="absolute -top-10 -right-10 opacity-[0.03] pointer-events-none">
+                        <i data-lucide="activity" style="width: 300px; height: 300px;"></i>
+                    </div>
+
+                    <div class="relative z-10 grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
+                        <!-- From -->
+                        <div class="space-y-6">
+                            <div class="neon-border-focus border border-slate-700 bg-slate-800/30 rounded-xl p-4 transition-all">
+                                <label class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1 block">原始数值</label>
+                                <div class="flex items-center">
+                                    <input type="number" id="input-value" value="1" oninput="convert()" class="bg-transparent text-2xl font-mono font-bold text-white w-full outline-none">
+                                    <span id="from-unit-tag" class="text-slate-500 font-mono text-sm ml-2">V</span>
+                                </div>
+                            </div>
+                            <div>
+                                <label class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2 block">从 (From)</label>
+                                <select id="from-prefix" onchange="convert()" class="w-full bg-slate-800/50 border border-slate-700 text-white px-4 py-2.5 rounded-xl outline-none"></select>
+                            </div>
+                        </div>
+
+                        <!-- To -->
+                        <div class="space-y-6">
+                            <div class="border border-slate-700/50 bg-cyan-500/5 rounded-xl p-4">
+                                <label class="text-[10px] font-bold text-cyan-500/60 uppercase tracking-widest mb-1 block">换算结果</label>
+                                <div class="flex items-center">
+                                    <div id="output-value" class="text-2xl font-mono font-bold text-cyan-400 w-full truncate">1000</div>
+                                    <span id="to-unit-tag" class="text-cyan-600 font-mono text-sm ml-2">mV</span>
+                                </div>
+                            </div>
+                            <div>
+                                <label class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2 block">转换为 (To)</label>
+                                <select id="to-prefix" onchange="convert()" class="w-full bg-slate-800/50 border border-slate-700 text-white px-4 py-2.5 rounded-xl outline-none"></select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mt-12 pt-6 border-t border-white/5 flex flex-wrap items-center gap-6">
+                        <div class="flex items-center gap-2 text-xs text-slate-500">
+                            <i data-lucide="info" class="w-4 h-4"></i>
+                            科学计数法: <span id="exp-result" class="text-slate-300 font-mono">1.000e+0</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Section: Ohm's Law -->
+        <div id="ohms-law" class="tab-content">
+            <div class="max-w-3xl mx-auto glass-card p-8 border-t-4 border-t-indigo-500">
+                <div class="flex items-center justify-between mb-8">
+                    <div>
+                        <h3 class="text-2xl font-black text-white">欧姆定律实验室</h3>
+                        <p class="text-slate-400 text-sm">输入任意两个已知量计算第三个值 ($V = I \times R$)</p>
+                    </div>
+                    <button onclick="resetOhm()" class="p-2 hover:bg-white/5 rounded-lg text-slate-500 transition-colors">
+                        <i data-lucide="rotate-ccw" class="w-5 h-5"></i>
+                    </button>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                    <div class="space-y-2">
+                        <label class="text-[10px] font-bold text-slate-500 uppercase tracking-widest">电压 (V)</label>
+                        <div class="relative">
+                            <input type="number" id="ohm-v" placeholder="电压" class="w-full bg-slate-800/50 border border-slate-700 text-white px-4 py-3 rounded-xl outline-none focus:border-indigo-500 font-mono">
+                            <span class="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 text-xs">V</span>
+                        </div>
+                    </div>
+                    <div class="space-y-2">
+                        <label class="text-[10px] font-bold text-slate-500 uppercase tracking-widest">电流 (I)</label>
+                        <div class="relative">
+                            <input type="number" id="ohm-i" placeholder="电流" class="w-full bg-slate-800/50 border border-slate-700 text-white px-4 py-3 rounded-xl outline-none focus:border-indigo-500 font-mono">
+                            <span class="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 text-xs">A</span>
+                        </div>
+                    </div>
+                    <div class="space-y-2">
+                        <label class="text-[10px] font-bold text-slate-500 uppercase tracking-widest">电阻 (R)</label>
+                        <div class="relative">
+                            <input type="number" id="ohm-r" placeholder="电阻" class="w-full bg-slate-800/50 border border-slate-700 text-white px-4 py-3 rounded-xl outline-none focus:border-indigo-500 font-mono">
+                            <span class="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 text-xs">Ω</span>
+                        </div>
+                    </div>
+                </div>
+
+                <button onclick="calculateOhm()" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-4 rounded-xl shadow-lg shadow-indigo-900/40 transition-all flex items-center justify-center gap-2 mb-6 uppercase tracking-widest text-sm">
+                    <i data-lucide="play" class="w-4 h-4 fill-current"></i>
+                    执行计算
+                </button>
+
+                <div id="ohm-result-box" class="hidden p-6 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 text-center animate-in fade-in zoom-in duration-300">
+                    <div class="text-indigo-400 text-[10px] font-bold uppercase mb-1 tracking-[0.3em]">Result</div>
+                    <div id="ohm-result-text" class="text-3xl font-mono font-black text-white">--</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- SI Prefix Reference -->
+        <section class="mt-20">
+            <h4 class="text-center text-slate-600 text-[10px] font-bold uppercase tracking-[0.4em] mb-10">国际单位词头参考</h4>
+            <div id="prefix-grid" class="grid grid-cols-3 md:grid-cols-9 gap-4">
+                <!-- JS will inject cards here -->
+            </div>
+        </section>
+
+        <!-- Footer -->
+        <footer class="mt-24 pt-8 border-t border-white/5 text-center">
+            <p class="text-slate-600 text-xs font-medium tracking-widest uppercase">
+                &copy; 2025 ElectroShift // 高性能电子物理计算套件
+            </p>
+        </footer>
+    </div>
+
+    <script>
+        // --- Data ---
+        const PREFIXES = [
+            { name: 'Tera (T)', factor: 1e12, symbol: 'T' },
+            { name: 'Giga (G)', factor: 1e9, symbol: 'G' },
+            { name: 'Mega (M)', factor: 1e6, symbol: 'M' },
+            { name: 'kilo (k)', factor: 1e3, symbol: 'k' },
+            { name: 'Base (单位)', factor: 1, symbol: '' },
+            { name: 'milli (m)', factor: 1e-3, symbol: 'm' },
+            { name: 'micro (μ)', factor: 1e-6, symbol: 'μ' },
+            { name: 'nano (n)', factor: 1e-9, symbol: 'n' },
+            { name: 'pico (p)', factor: 1e-12, symbol: 'p' },
+        ];
+
+        const UNIT_INFO = {
+            voltage: { unit: 'V', icon: 'zap' },
+            current: { unit: 'A', icon: 'activity' },
+            resistance: { unit: 'Ω', icon: 'cpu' },
+            power: { unit: 'W', icon: 'zap' },
+            capacitance: { unit: 'F', icon: 'layers' },
+            inductance: { unit: 'H', icon: 'milestone' },
+            frequency: { unit: 'Hz', icon: 'maximize-2' }
+        };
+
+        // --- Core Logic ---
+
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.remove('bg-cyan-600', 'text-white', 'shadow-lg');
+                btn.classList.add('text-slate-500');
+            });
+
+            document.getElementById(tabId).classList.add('active');
+            const activeBtn = document.getElementById(`btn-${tabId}`);
+
+            if(tabId === 'converter') {
+                activeBtn.classList.add('bg-cyan-600', 'text-white', 'shadow-lg');
+            } else {
+                activeBtn.classList.add('bg-indigo-600', 'text-white', 'shadow-lg');
+            }
+            activeBtn.classList.remove('text-slate-500');
+        }
+
+        function initConverter() {
+            const type = document.getElementById('unit-type').value;
+            const info = UNIT_INFO[type];
+
+            document.getElementById('base-unit-display').innerText = info.unit;
+            document.getElementById('from-unit-tag').innerText = info.unit;
+            document.getElementById('to-unit-tag').innerText = info.unit;
+
+            // Update Icon
+            const iconBox = document.getElementById('unit-icon');
+            iconBox.innerHTML = `<i data-lucide="${info.icon}"></i>`;
+
+            lucide.createIcons();
+            convert();
+        }
+
+        function convert() {
+            const val = parseFloat(document.getElementById('input-value').value) || 0;
+            const fromFactor = parseFloat(document.getElementById('from-prefix').value);
+            const toFactor = parseFloat(document.getElementById('to-prefix').value);
+            const type = document.getElementById('unit-type').value;
+            const unit = UNIT_INFO[type].unit;
+
+            const result = (val * fromFactor) / toFactor;
+
+            // Result formatting
+            const displayValue = result.toLocaleString(undefined, { maximumFractionDigits: 10 });
+            document.getElementById('output-value').innerText = displayValue;
+
+            // Symbol tags
+            const fromPrefixObj = PREFIXES.find(p => p.factor === fromFactor);
+            const toPrefixObj = PREFIXES.find(p => p.factor === toFactor);
+            document.getElementById('from-unit-tag').innerText = fromPrefixObj.symbol + unit;
+            document.getElementById('to-unit-tag').innerText = toPrefixObj.symbol + unit;
+
+            // Scientific notation
+            document.getElementById('exp-result').innerText = result.toExponential(4);
+        }
+
+        function calculateOhm() {
+            const v = parseFloat(document.getElementById('ohm-v').value);
+            const i = parseFloat(document.getElementById('ohm-i').value);
+            const r = parseFloat(document.getElementById('ohm-r').value);
+            const box = document.getElementById('ohm-result-box');
+            const text = document.getElementById('ohm-result-text');
+
+            box.classList.remove('hidden');
+            let res = "";
+
+            if (!isNaN(v) && !isNaN(i)) res = `电阻 R = ${(v / i).toFixed(4)} Ω`;
+            else if (!isNaN(v) && !isNaN(r)) res = `电流 I = ${(v / r).toFixed(4)} A`;
+            else if (!isNaN(i) && !isNaN(r)) res = `电压 V = ${(i * r).toFixed(4)} V`;
+            else res = "请输入任意两项";
+
+            text.innerText = res;
+        }
+
+        function resetOhm() {
+            document.getElementById('ohm-v').value = '';
+            document.getElementById('ohm-i').value = '';
+            document.getElementById('ohm-r').value = '';
+            document.getElementById('ohm-result-box').classList.add('hidden');
+        }
+
+        // --- Initialization ---
+        window.onload = () => {
+            // Populate select options
+            const fromSelect = document.getElementById('from-prefix');
+            const toSelect = document.getElementById('to-prefix');
+            const prefixGrid = document.getElementById('prefix-grid');
+
+            PREFIXES.forEach((p, index) => {
+                const optFrom = new Option(p.name, p.factor);
+                const optTo = new Option(p.name, p.factor);
+
+                // Defaults: Base to milli
+                if (p.factor === 1) optFrom.selected = true;
+                if (p.factor === 0.001) optTo.selected = true;
+
+                fromSelect.add(optFrom);
+                toSelect.add(optTo);
+
+                // Add card to reference grid
+                const card = document.createElement('div');
+                card.className = "flex flex-col items-center p-4 bg-white/5 rounded-2xl border border-white/5 transition-all hover:bg-white/10";
+                card.innerHTML = `
+                    <span class="text-cyan-400 font-bold text-lg">${p.symbol || '单位'}</span>
+                    <span class="text-[9px] text-slate-500 font-mono mt-1 uppercase tracking-tighter">${p.name.split(' ')[0]}</span>
+                    <span class="text-[9px] text-slate-600 font-mono mt-0.5">10^${Math.log10(p.factor)}</span>
+                `;
+                prefixGrid.appendChild(card);
+            });
+
+            lucide.createIcons();
+            initConverter();
+        };
+    </script>
+</body>
+</html>

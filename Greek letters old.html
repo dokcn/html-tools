@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Greek Alphabet Guide</title>
+    <style>
+        :root {
+            --primary-color: #005BAA; /* Greek Blue */
+            --secondary-color: #f0f4f8;
+            --text-color: #333;
+            --card-bg: #ffffff;
+            --accent: #FFD700;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--secondary-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        header {
+            background: linear-gradient(135deg, var(--primary-color), #004280);
+            color: white;
+            width: 100%;
+            padding: 2rem 1rem;
+            text-align: center;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            margin-bottom: 2rem;
+        }
+
+        h1 {
+            margin: 0;
+            font-size: 2.5rem;
+            letter-spacing: 1px;
+        }
+
+        p.subtitle {
+            margin-top: 0.5rem;
+            opacity: 0.9;
+        }
+
+        /* Search Bar */
+        .search-container {
+            margin-bottom: 2rem;
+            width: 90%;
+            max-width: 500px;
+        }
+
+        input[type="text"] {
+            width: 100%;
+            padding: 12px 20px;
+            font-size: 1.1rem;
+            border: 2px solid #ddd;
+            border-radius: 25px;
+            outline: none;
+            transition: border-color 0.3s;
+        }
+
+        input[type="text"]:focus {
+            border-color: var(--primary-color);
+        }
+
+        /* Grid Layout */
+        .grid-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            gap: 1.5rem;
+            width: 90%;
+            max-width: 1200px;
+            padding-bottom: 3rem;
+        }
+
+        /* Card Styling */
+        .card {
+            background: var(--card-bg);
+            border-radius: 16px;
+            padding: 1.5rem;
+            text-align: center;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+            transition: transform 0.2s, box-shadow 0.2s;
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+            border-bottom: 4px solid var(--secondary-color);
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 25px rgba(0,91,170,0.2);
+            border-bottom-color: var(--primary-color);
+        }
+
+        .card:active {
+            transform: scale(0.98);
+        }
+
+        .letters {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            font-size: 3.5rem;
+            color: var(--primary-color);
+            font-family: 'Times New Roman', Times, serif; /* Serifs look better for Greek */
+            margin-bottom: 0.5rem;
+        }
+
+        .name {
+            font-size: 1.25rem;
+            font-weight: 700;
+            margin-bottom: 0.25rem;
+            text-transform: capitalize;
+        }
+
+        .pronounce {
+            font-size: 0.9rem;
+            color: #666;
+            font-style: italic;
+            background: #eee;
+            padding: 2px 8px;
+            border-radius: 12px;
+            display: inline-block;
+        }
+
+        .speaker-icon {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            opacity: 0.2;
+            width: 20px;
+            transition: opacity 0.3s;
+        }
+
+        .card:hover .speaker-icon {
+            opacity: 0.8;
+            fill: var(--primary-color);
+        }
+
+        /* Responsive adjustments */
+        @media (max-width: 600px) {
+            h1 { font-size: 1.8rem; }
+            .letters { font-size: 2.8rem; }
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>Greek Alphabet</h1>
+        <p class="subtitle">Click any card to hear pronunciation</p>
+    </header>
+
+    <div class="search-container">
+        <input type="text" id="searchInput" placeholder="Search letters (e.g. 'Beta' or 'b')...">
+    </div>
+
+    <div class="grid-container" id="cardGrid">
+        </div>
+
+    <script>
+        const greekData = [
+            { name: "Alpha", upper: "Α", lower: "α", sound: "AL-fah" },
+            { name: "Beta", upper: "Β", lower: "β", sound: "BAY-tah" },
+            { name: "Gamma", upper: "Γ", lower: "γ", sound: "GAM-ah" },
+            { name: "Delta", upper: "Δ", lower: "δ", sound: "DEL-tah" },
+            { name: "Epsilon", upper: "Ε", lower: "ε", sound: "EP-si-lon" },
+            { name: "Zeta", upper: "Ζ", lower: "ζ", sound: "ZAY-tah" },
+            { name: "Eta", upper: "Η", lower: "η", sound: "AY-tah" },
+            { name: "Theta", upper: "Θ", lower: "θ", sound: "THAY-tah" },
+            { name: "Iota", upper: "Ι", lower: "ι", sound: "eye-OH-tah" },
+            { name: "Kappa", upper: "Κ", lower: "κ", sound: "KAP-ah" },
+            { name: "Lambda", upper: "Λ", lower: "λ", sound: "LAM-dah" },
+            { name: "Mu", upper: "Μ", lower: "μ", sound: "MYOO" },
+            { name: "Nu", upper: "Ν", lower: "ν", sound: "NOO" },
+            { name: "Xi", upper: "Ξ", lower: "ξ", sound: "ZYE" },
+            { name: "Omicron", upper: "Ο", lower: "ο", sound: "OM-i-kron" },
+            { name: "Pi", upper: "Π", lower: "π", sound: "PIE" },
+            { name: "Rho", upper: "Ρ", lower: "ρ", sound: "ROW" },
+            { name: "Sigma", upper: "Σ", lower: "σ/ς", sound: "SIG-mah" },
+            { name: "Tau", upper: "Τ", lower: "τ", sound: "TOW" },
+            { name: "Upsilon", upper: "Υ", lower: "υ", sound: "OOP-si-lon" },
+            { name: "Phi", upper: "Φ", lower: "φ", sound: "FIE" },
+            { name: "Chi", upper: "Χ", lower: "χ", sound: "KIE" },
+            { name: "Psi", upper: "Ψ", lower: "ψ", sound: "SYE" },
+            { name: "Omega", upper: "Ω", lower: "ω", sound: "oh-MAY-gah" }
+        ];
+
+        const grid = document.getElementById('cardGrid');
+        const searchInput = document.getElementById('searchInput');
+
+        // Speaker Icon SVG
+        const speakerSVG = `
+        <svg class="speaker-icon" viewBox="0 0 24 24">
+            <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>
+        </svg>`;
+
+        function renderCards(filterText = '') {
+            grid.innerHTML = '';
+            
+            const filtered = greekData.filter(item => 
+                item.name.toLowerCase().includes(filterText.toLowerCase()) ||
+                item.upper.includes(filterText) ||
+                item.lower.includes(filterText)
+            );
+
+            filtered.forEach(item => {
+                const card = document.createElement('div');
+                card.className = 'card';
+                card.onclick = () => speak(item.name);
+                
+                card.innerHTML = `
+                    ${speakerSVG}
+                    <div class="letters">
+                        <span>${item.upper}</span>
+                        <span>${item.lower}</span>
+                    </div>
+                    <div class="name">${item.name}</div>
+                    <div class="pronounce">/${item.sound}/</div>
+                `;
+                grid.appendChild(card);
+            });
+        }
+
+        // Text to Speech Function
+        function speak(text) {
+            // Cancel any current speech to avoid overlap
+            window.speechSynthesis.cancel();
+
+            const msg = new SpeechSynthesisUtterance();
+            msg.text = text;
+            msg.lang = 'en-US'; // Pronounces the English name (e.g. "Alpha")
+            msg.rate = 0.9;     // Slightly slower for clarity
+            msg.pitch = 1;
+            
+            window.speechSynthesis.speak(msg);
+        }
+
+        // Search Listener
+        searchInput.addEventListener('input', (e) => {
+            renderCards(e.target.value);
+        });
+
+        // Initial Render
+        renderCards();
+    </script>
+</body>
+</html>

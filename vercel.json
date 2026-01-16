@@ -1,0 +1,17 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "rewrites": [
+    {
+      "source": "/g",
+      "destination": "/greek_letters.html"
+    },
+    {
+      "source": "/u",
+      "destination": "/unit_converter.html"
+    },
+    {
+      "source": "/d",
+      "destination": "/u8g2_emulator.html"
+    }
+  ]
+}
