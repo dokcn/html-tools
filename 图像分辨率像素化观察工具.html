@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>图像分辨率像素化观察工具</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .pixelated {
+            image-rendering: pixelated;
+            image-rendering: crisp-edges;
+        }
+        canvas {
+            max-width: 100%;
+            height: auto;
+            border-radius: 4px;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+        }
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 1.5rem;
+            transition: all 0.3s ease;
+        }
+        .card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1);
+        }
+    </style>
+</head>
+<body class="bg-slate-50 min-h-screen text-slate-800 p-4 md:p-8">
+    <div class="max-w-6xl mx-auto">
+        <header class="mb-8 text-center">
+            <h1 class="text-3xl font-bold text-slate-900 mb-2">单片机屏幕分辨率模拟器</h1>
+            <p class="text-slate-600">上传图片并观察不同分辨率下的“像素化”程度，帮助你为嵌入式开发选择合适的分辨率。</p>
+        </header>
+
+        <!-- 控制面板 -->
+        <div class="bg-white p-6 rounded-2xl shadow-sm mb-8">
+            <div class="flex flex-col md:flex-row items-center justify-between gap-6">
+                <div class="w-full md:w-1/2">
+                    <label class="block text-sm font-medium text-slate-700 mb-2">选择原始图片</label>
+                    <input type="file" id="imageInput" accept="image/*" 
+                        class="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer">
+                </div>
+                <div id="statusInfo" class="text-sm text-slate-500 bg-slate-100 px-4 py-2 rounded-lg hidden">
+                    检测到比例: <span id="aspectRatio" class="font-mono font-bold text-blue-600">-</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 结果展示网格 -->
+        <div id="resultsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <!-- 初始占位提示 -->
+            <div class="col-span-full py-20 text-center border-2 border-dashed border-slate-200 rounded-2xl">
+                <p class="text-slate-400">请先上传一张图片（例如 1920x1080）来开始模拟</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const imageInput = document.getElementById('imageInput');
+        const resultsGrid = document.getElementById('resultsGrid');
+        const statusInfo = document.getElementById('statusInfo');
+        const aspectRatioSpan = document.getElementById('aspectRatio');
+
+        imageInput.addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                const img = new Image();
+                img.onload = function() {
+                    processImage(img);
+                };
+                img.src = event.target.result;
+            };
+            reader.readAsDataURL(file);
+        });
+
+        function gcd(a, b) {
+            return b === 0 ? a : gcd(b, a % b);
+        }
+
+        function processImage(img) {
+            const w = img.width;
+            const h = img.height;
+            const commonDivisor = gcd(w, h);
+            const ratioW = w / commonDivisor;
+            const ratioH = h / commonDivisor;
+
+            statusInfo.classList.remove('hidden');
+            aspectRatioSpan.textContent = `${w}x${h} (约 ${ratioW}:${ratioH})`;
+
+            resultsGrid.innerHTML = '';
+
+            // 定义我们想要展示的分辨率阶段
+            // 包含用户提到的步进，以及单片机常见的极低分辨率
+            const steps = [
+                { w: w, label: '原始分辨率' },
+                { w: Math.round(w * 0.8), label: '80% 尺寸' },
+                { w: Math.round(w * 0.5), label: '50% 尺寸 (高清预览)' },
+                { w: 480, label: '480p 级别' },
+                { w: 320, label: 'QVGA (常见 2.4/2.8寸屏)' },
+                { w: 240, label: '240p (典型圆形表盘屏)' },
+                { w: 128, label: '128p (OLED 模块常用)' },
+                { w: 64, label: '64p (极低功耗屏)' },
+                { w: 32, label: '32p (图标量级)' },
+                { w: 16, label: '16p (像素画感)' }
+            ];
+
+            steps.forEach(step => {
+                if (step.w > w && step.label !== '原始分辨率') return;
+
+                // 计算当前高度
+                const targetW = step.w;
+                const targetH = Math.round((h / w) * targetW);
+
+                createResolutionCard(img, targetW, targetH, step.label);
+            });
+        }
+
+        function createResolutionCard(img, targetW, targetH, label) {
+            const card = document.createElement('div');
+            card.className = 'card flex flex-col items-center';
+
+            const info = document.createElement('div');
+            info.className = 'w-full mb-4';
+            info.innerHTML = `
+                <div class="flex justify-between items-end">
+                    <span class="text-xs font-bold text-blue-500 uppercase tracking-wider">${label}</span>
+                    <span class="text-sm font-mono text-slate-400">${targetW} × ${targetH}</span>
+                </div>
+                <div class="h-1 w-full bg-slate-100 mt-2 rounded-full overflow-hidden">
+                    <div class="h-full bg-blue-500" style="width: ${(targetW / img.width * 100)}%"></div>
+                </div>
+            `;
+
+            // 我们使用离屏 canvas 来缩放图片
+            const canvas = document.createElement('canvas');
+            canvas.width = targetW;
+            canvas.height = targetH;
+            canvas.className = 'pixelated w-full bg-black';
+            
+            const ctx = canvas.getContext('2d');
+            // 关键：关闭平滑处理，以模拟屏幕像素感
+            ctx.imageSmoothingEnabled = false;
+            ctx.drawImage(img, 0, 0, targetW, targetH);
+
+            card.appendChild(info);
+            card.appendChild(canvas);
+            
+            const storageInfo = document.createElement('p');
+            storageInfo.className = 'mt-3 text-[10px] text-slate-400 text-center italic';
+            const bytes = Math.round(targetW * targetH * 2 / 1024); // 假设 RGB565 格式
+            storageInfo.innerText = `估计占用 Flash: ~${bytes} KB (RGB565)`;
+            card.appendChild(storageInfo);
+
+            resultsGrid.appendChild(card);
+        }
+    </script>
+</body>
+</html>

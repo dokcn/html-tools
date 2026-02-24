@@ -12,6 +12,10 @@
     {
       "source": "/d",
       "destination": "/u8g2_emulator.html"
+    },
+    {
+      "source": "/pixel",
+      "destination": "/图像分辨率像素化观察工具.html"
     }
   ]
 }
