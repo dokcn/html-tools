@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>数字逻辑门互动教程</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    /* 优化滚动条样式，使其更美观 */
+    #cards-container::-webkit-scrollbar {
+      height: 8px;
+    }
+    #cards-container::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    #cards-container::-webkit-scrollbar-thumb {
+      background-color: #cbd5e1;
+      border-radius: 4px;
+    }
+    @media (prefers-color-scheme: dark) {
+      #cards-container::-webkit-scrollbar-thumb {
+        background-color: #475569;
+      }
+    }
+  </style>
+</head>
+<body class="min-h-screen bg-slate-100 dark:bg-slate-900 p-6 md:p-10 font-sans">
+  <div class="max-w-6xl mx-auto flex flex-col h-full">
+    <header class="mb-10 text-center">
+      <h1 class="text-3xl md:text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-emerald-500 mb-3">
+        数字逻辑门互动教程
+      </h1>
+      <p class="text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">
+        学习基础数字电路的最佳方式是实践。在下方的面板中，点击各个逻辑门左侧的 
+        <span class="inline-block w-4 h-4 rounded-full bg-gray-400 mx-1 align-middle"></span> / 
+        <span class="inline-block w-4 h-4 rounded-full bg-emerald-500 mx-1 align-middle"></span> 
+        输入点（0 或 1），观察电流如何通过标准逻辑符号，并实时比对真值表。
+      </p>
+    </header>
+
+    <!-- 卡片横向滚动容器，使用 items-stretch 保证内部子元素高度一致 -->
+    <div id="cards-container" class="flex items-stretch overflow-x-auto gap-6 pb-8">
+      <!-- 卡片将由 JavaScript 动态生成并注入此处 -->
+    </div>
+    
+    <footer class="mt-12 text-center text-sm text-gray-500">
+      * 符号采用标准 ANSI/IEEE 形状。绿色代表高电平 (1 / True)，灰色代表低电平 (0 / False)。
+    </footer>
+  </div>
+
+  <script>
+    // 定义逻辑门的数据和行为
+    const gateData = [
+      {
+        id: 'and',
+        name: '与门 (AND)',
+        expr: 'Y = A · B',
+        inputs: 2,
+        logic: (a, b) => a && b,
+        desc: '【有 0 出 0，全 1 出 1】仅当所有输入都为 1 时，输出才为 1。',
+        tt: [[0, 0, 0], [0, 1, 0], [1, 0, 0], [1, 1, 1]]
+      },
+      {
+        id: 'or',
+        name: '或门 (OR)',
+        expr: 'Y = A + B',
+        inputs: 2,
+        logic: (a, b) => a || b,
+        desc: '【有 1 出 1，全 0 出 0】只要有任何一个输入为 1，输出就为 1。',
+        tt: [[0, 0, 0], [0, 1, 1], [1, 0, 1], [1, 1, 1]]
+      },
+      {
+        id: 'not',
+        name: '非门 (NOT)',
+        expr: "Y = A'",
+        inputs: 1,
+        logic: (a) => !a,
+        desc: '【遇 0 变 1，遇 1 变 0】输出总是与输入状态相反。也称为反相器。',
+        tt: [[0, 1], [1, 0]]
+      },
+      {
+        id: 'nand',
+        name: '与非门 (NAND)',
+        expr: "Y = (A · B)'",
+        inputs: 2,
+        logic: (a, b) => !(a && b),
+        desc: '【有 0 出 1，全 1 出 0】与门的相反状态。',
+        tt: [[0, 0, 1], [0, 1, 1], [1, 0, 1], [1, 1, 0]]
+      },
+      {
+        id: 'nor',
+        name: '或非门 (NOR)',
+        expr: "Y = (A + B)'",
+        inputs: 2,
+        logic: (a, b) => !(a || b),
+        desc: '【有 1 出 0，全 0 出 1】或门的相反状态。',
+        tt: [[0, 0, 1], [0, 1, 0], [1, 0, 0], [1, 1, 0]]
+      },
+      {
+        id: 'xor',
+        name: '异或门 (XOR)',
+        expr: 'Y = A ⊕ B',
+        inputs: 2,
+        logic: (a, b) => a !== b,
+        desc: '【相同出 0，不同出 1】输入状态不相同时输出为高电平 (1)。',
+        tt: [[0, 0, 0], [0, 1, 1], [1, 0, 1], [1, 1, 0]]
+      },
+      {
+        id: 'xnor',
+        name: '同或门 (XNOR)',
+        expr: 'Y = A ⊙ B',
+        inputs: 2,
+        logic: (a, b) => a === b,
+        desc: '【相同出 1，不同出 0】输入状态相同时输出为高电平 (1)。',
+        tt: [[0, 0, 1], [0, 1, 0], [1, 0, 0], [1, 1, 1]]
+      }
+    ];
+
+    // 存储每个逻辑门的状态
+    const gateStates = {};
+    gateData.forEach(gate => {
+      gateStates[gate.id] = { inA: 0, inB: 0 };
+    });
+
+    // 颜色配置
+    const colorHigh = '#10b981'; // Emerald 500
+    const colorLow = '#9ca3af';  // Gray 400
+    const getColor = (val) => val ? colorHigh : colorLow;
+
+    // 获取门电路 SVG 符号
+    function getGateSymbol(id) {
+      const baseClass = "fill-white dark:fill-gray-800 text-gray-800 dark:text-gray-200";
+      const lineClass = "stroke-current stroke-[3px] stroke-linecap-round stroke-linejoin-round";
+      
+      switch (id) {
+        case 'and':
+          return `<path d="M 35,20 L 60,20 A 20,20 0 0,1 60,60 L 35,60 Z" class="${baseClass} ${lineClass}" />`;
+        case 'nand':
+          return `
+            <g class="${baseClass} ${lineClass}">
+              <path d="M 35,20 L 60,20 A 20,20 0 0,1 60,60 L 35,60 Z" />
+              <circle cx="84" cy="40" r="4" />
+            </g>
+          `;
+        case 'or':
+          return `<path d="M 35,20 Q 65,20 85,40 Q 65,60 35,60 Q 50,40 35,20 Z" class="${baseClass} ${lineClass}" />`;
+        case 'nor':
+          return `
+            <g class="${baseClass} ${lineClass}">
+              <path d="M 35,20 Q 65,20 80,40 Q 65,60 35,60 Q 50,40 35,20 Z" />
+              <circle cx="84" cy="40" r="4" />
+            </g>
+          `;
+        case 'xor':
+          return `
+            <g class="${baseClass} ${lineClass}">
+              <path d="M 27,20 Q 42,40 27,60" fill="none" />
+              <path d="M 35,20 Q 65,20 85,40 Q 65,60 35,60 Q 50,40 35,20 Z" />
+            </g>
+          `;
+        case 'xnor':
+          return `
+            <g class="${baseClass} ${lineClass}">
+              <path d="M 27,20 Q 42,40 27,60" fill="none" />
+              <path d="M 35,20 Q 65,20 80,40 Q 65,60 35,60 Q 50,40 35,20 Z" />
+              <circle cx="84" cy="40" r="4" />
+            </g>
+          `;
+        case 'not':
+          return `
+            <g class="${baseClass} ${lineClass}">
+              <path d="M 45,25 L 75,40 L 45,55 Z" />
+              <circle cx="79" cy="40" r="4" />
+            </g>
+          `;
+        default:
+          return '';
+      }
+    }
+
+    // 生成单个逻辑门卡片的 HTML 内容
+    function generateGateHTML(gate) {
+      const state = gateStates[gate.id];
+      const isNot = gate.inputs === 1;
+      const inA = state.inA;
+      const inB = state.inB;
+      const out = isNot ? (gate.logic(inA) ? 1 : 0) : (gate.logic(inA, inB) ? 1 : 0);
+
+      // 生成输入连线
+      let inputLines = '';
+      if (!isNot) {
+        inputLines += `<line x1="25" y1="28" x2="45" y2="28" stroke="${getColor(inA)}" />`;
+        inputLines += `<line x1="25" y1="52" x2="45" y2="52" stroke="${getColor(inB)}" />`;
+      } else {
+        inputLines += `<line x1="25" y1="40" x2="55" y2="40" stroke="${getColor(inA)}" />`;
+      }
+
+      // 生成交互控制点 (输入端)
+      let inputControls = `
+        <g class="cursor-pointer" onclick="toggleInput('${gate.id}', 'inA')">
+          <circle cx="15" cy="${isNot ? 40 : 28}" r="8" fill="${getColor(inA)}" class="transition-colors hover:brightness-110" />
+          <text x="15" y="${isNot ? 44 : 32}" text-anchor="middle" font-size="11" font-weight="bold" fill="white">${inA}</text>
+        </g>
+      `;
+      if (!isNot) {
+        inputControls += `
+          <g class="cursor-pointer" onclick="toggleInput('${gate.id}', 'inB')">
+            <circle cx="15" cy="52" r="8" fill="${getColor(inB)}" class="transition-colors hover:brightness-110" />
+            <text x="15" y="56" text-anchor="middle" font-size="11" font-weight="bold" fill="white">${inB}</text>
+          </g>
+        `;
+      }
+
+      // 生成真值表行
+      const truthTableRows = gate.tt.map((row) => {
+        const isActive = isNot ? row[0] === inA : (row[0] === inA && row[1] === inB);
+        const trClass = isActive 
+          ? 'bg-emerald-100 dark:bg-emerald-900/40 font-bold text-emerald-700 dark:text-emerald-400' 
+          : 'text-gray-700 dark:text-gray-300';
+          
+        let cols = `<td class="py-1 border border-gray-200 dark:border-gray-600">${row[0]}</td>`;
+        if (!isNot) {
+          cols += `<td class="py-1 border border-gray-200 dark:border-gray-600">${row[1]}</td>`;
+        }
+        cols += `<td class="py-1 border border-gray-200 dark:border-gray-600">${isNot ? row[1] : row[2]}</td>`;
+        
+        return `<tr class="transition-colors border border-gray-200 dark:border-gray-600 ${trClass}">${cols}</tr>`;
+      }).join('');
+
+      // 返回完整的卡片 HTML，使用 h-full 和 flex 确保高度填满并自适应
+      return `
+        <div class="flex flex-col h-full bg-white dark:bg-gray-800 rounded-xl shadow-md border border-gray-200 dark:border-gray-700 overflow-hidden hover:shadow-lg transition-shadow">
+          <div class="bg-gray-50 dark:bg-gray-900 px-5 py-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
+            <h3 class="text-lg font-bold text-gray-800 dark:text-white">${gate.name}</h3>
+            <span class="font-mono text-sm bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 px-2 py-1 rounded-md">
+              ${gate.expr}
+            </span>
+          </div>
+
+          <div class="p-5 flex-grow flex flex-col">
+            <div class="w-full h-40 bg-slate-50 dark:bg-slate-800/50 rounded-lg flex justify-center items-center mb-4 border border-slate-100 dark:border-slate-700 relative select-none">
+              <svg viewBox="0 0 120 80" xmlns="http://www.w3.org/2000/svg" class="w-full h-full max-w-[240px]">
+                <g stroke-width="3" stroke-linecap="round">
+                  ${inputLines}
+                  <line x1="75" y1="40" x2="95" y2="40" stroke="${getColor(out)}" />
+                </g>
+                ${getGateSymbol(gate.id)}
+                ${inputControls}
+                <g>
+                  <circle cx="105" cy="40" r="8" fill="${getColor(out)}" class="transition-colors" />
+                  <text x="105" y="44" text-anchor="middle" font-size="11" font-weight="bold" fill="white">${out}</text>
+                </g>
+              </svg>
+              <div class="absolute top-2 left-2 text-[10px] text-gray-400">点击输入端圆圈切换</div>
+            </div>
+
+            <p class="text-sm text-gray-700 dark:text-gray-300 font-medium mb-4 leading-relaxed">
+              ${gate.desc}
+            </p>
+
+            <div class="mt-auto">
+              <h4 class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">真值表 (Truth Table)</h4>
+              <table class="w-full text-center text-sm border-collapse">
+                <thead>
+                  <tr class="bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300">
+                    <th class="py-1 border border-gray-200 dark:border-gray-600">A</th>
+                    ${!isNot ? '<th class="py-1 border border-gray-200 dark:border-gray-600">B</th>' : ''}
+                    <th class="py-1 border border-gray-200 dark:border-gray-600 text-blue-600 dark:text-blue-400">Y</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${truthTableRows}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    // 全局函数，供 SVG 内部的 onClick 调用
+    window.toggleInput = function(gateId, inputName) {
+      // 切换 0 和 1
+      gateStates[gateId][inputName] ^= 1;
+      
+      // 更新特定卡片的 DOM
+      const gate = gateData.find(g => g.id === gateId);
+      const wrapper = document.getElementById(`gate-wrapper-${gateId}`);
+      if (wrapper) {
+        wrapper.innerHTML = generateGateHTML(gate);
+      }
+    };
+
+    // 初始化渲染
+    const container = document.getElementById('cards-container');
+    gateData.forEach(gate => {
+      // 外层 wrapper 设置了固定宽度，并通过 flex 让内容自适应拉伸高度
+      const wrapper = document.createElement('div');
+      wrapper.className = "w-[300px] sm:w-[350px] shrink-0 flex"; 
+      wrapper.id = `gate-wrapper-${gate.id}`;
+      wrapper.innerHTML = generateGateHTML(gate);
+      container.appendChild(wrapper);
+    });
+
+    // 核心需求：将卡片区域的上下鼠标滚动转化为左右滚动
+    container.addEventListener('wheel', (evt) => {
+      // 如果发生垂直滚动
+      if (Math.abs(evt.deltaY) > 0) {
+        evt.preventDefault(); // 阻止默认的上下滚动行为
+        // 增加了 1.5 的系数，让鼠标滚轮滚动起来更快更丝滑
+        container.scrollLeft += evt.deltaY * 1.5; 
+      }
+    }, { passive: false }); // 确保 preventDefault 能够正常工作
+
+  </script>
+</body>
+</html>
