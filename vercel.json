@@ -16,6 +16,10 @@
     {
       "source": "/pixel",
       "destination": "/图像分辨率像素化观察工具.html"
+    },
+    {
+      "source": "/kmap",
+      "destination": "/KarnaughMap.html"
     }
   ]
 }
