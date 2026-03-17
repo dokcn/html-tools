@@ -2,6 +2,10 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "rewrites": [
     {
+      "source": "/",
+      "destination": "/index.html"
+    },
+    {
       "source": "/g",
       "destination": "/greek_letters.html"
     },
@@ -20,6 +24,10 @@
     {
       "source": "/kmap",
       "destination": "/KarnaughMap.html"
+    },
+    {
+      "source": "/cla",
+      "destination": "/超前进位加法器.html"
     },
     {
       "source": "/ds",

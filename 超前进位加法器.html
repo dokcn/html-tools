@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>4位超前进位加法器 (Carry-Lookahead Adder)</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-50 font-sans text-slate-800">
+
+  <div id="app" class="flex flex-col items-center w-full min-h-screen p-6">
+    <!-- 内容将由 JavaScript 动态渲染 -->
+  </div>
+
+  <script>
+    // --- 状态数据 ---
+    let a = [0, 1, 0, 1];
+    let b = [1, 1, 0, 0];
+    let c0 = 0;
+
+    // --- UI常量与配置 ---
+    const centers = [720, 520, 320, 120]; // 4个位的X轴中心
+    const colors = {
+      gray: "#cbd5e1", // 信号为 0
+      red: "#ef4444",   // 输入 A/B (信号 1)
+      blue: "#3b82f6",  // 传播 P (信号 1)
+      green: "#10b981", // 生成 G (信号 1)
+      orange: "#f59e0b",// 进位 C (信号 1)
+      purple: "#8b5cf6" // 结果 S (信号 1)
+    };
+
+    function getColor(val, type) {
+      return val === 0 ? colors.gray : colors[type];
+    }
+
+    function getMarker(val, type) {
+      return val === 0 ? "url(#arrowGray)" : `url(#arrow${type})`;
+    }
+
+    // --- 交互处理函数 ---
+    function toggleA(index) {
+      a[index] = a[index] === 0 ? 1 : 0;
+      render();
+    }
+
+    function toggleB(index) {
+      b[index] = b[index] === 0 ? 1 : 0;
+      render();
+    }
+
+    function toggleC0() {
+      c0 = c0 === 0 ? 1 : 0;
+      render();
+    }
+
+    // --- 核心渲染与计算 ---
+    function render() {
+      // 1. 计算每一位的 传播(P) 和 生成(G)
+      const p = a.map((bitA, i) => bitA ^ b[i]); // P = A XOR B
+      const g = a.map((bitA, i) => bitA & b[i]); // G = A AND B
+
+      // 2. 超前进位逻辑 (并行一次性算出所有的 C)
+      const c = [];
+      c[0] = c0;
+      c[1] = g[0] | (p[0] & c[0]); 
+      c[2] = g[1] | (p[1] & g[0]) | (p[1] & p[0] & c[0]); 
+      c[3] = g[2] | (p[2] & g[1]) | (p[2] & p[1] & g[0]) | (p[2] & p[1] & p[0] & c[0]); 
+      const c4 = g[3] | (p[3] & g[2]) | (p[3] & p[2] & g[1]) | (p[3] & p[2] & p[1] & g[0]) | (p[3] & p[2] & p[1] & p[0] & c[0]);
+
+      // 3. 计算最终的和 (S = P XOR C)
+      const s = p.map((pi, i) => pi ^ c[i]);
+
+      // 十进制值
+      const valA_dec = a[3] * 8 + a[2] * 4 + a[1] * 2 + a[0] * 1;
+      const valB_dec = b[3] * 8 + b[2] * 4 + b[1] * 2 + b[0] * 1;
+      const valS_dec = c4 * 16 + s[3] * 8 + s[2] * 4 + s[1] * 2 + s[0] * 1;
+
+      // 构建 4 个位列的 SVG 元素
+      let bitsSvgHtml = '';
+      for (let i = 0; i < 4; i++) {
+        const cx = centers[i];
+        const bitA = a[i];
+        const bitB = b[i];
+        const pi = p[i];
+        const gi = g[i];
+        const ci = c[i];
+        const si = s[i];
+
+        bitsSvgHtml += `
+          <g>
+            <!-- 第一级：P 和 G 生成器 -->
+            <rect x="${cx - 40}" y="100" width="80" height="60" rx="6" fill="white" stroke="#64748b" stroke-width="2" />
+            <text x="${cx}" y="125" text-anchor="middle" fill="#334155" font-size="14" font-weight="bold">P/G Gen</text>
+            <text x="${cx}" y="145" text-anchor="middle" fill="#64748b" font-size="12">Bit ${i}</text>
+
+            <!-- 输入 A -->
+            <line x1="${cx - 20}" y1="50" x2="${cx - 20}" y2="90" stroke="${getColor(bitA, 'red')}" stroke-width="4" marker-end="${getMarker(bitA, 'red')}" />
+            <circle cx="${cx - 20}" cy="35" r="16" fill="${getColor(bitA, 'red')}" class="cursor-pointer hover:opacity-80 transition-opacity" onclick="toggleA(${i})" />
+            <text x="${cx - 20}" y="41" text-anchor="middle" fill="white" font-size="16" font-weight="bold" class="pointer-events-none">${bitA}</text>
+            <text x="${cx - 20}" y="12" text-anchor="middle" fill="#475569" font-size="14" font-weight="bold">A${i}</text>
+
+            <!-- 输入 B -->
+            <line x1="${cx + 20}" y1="50" x2="${cx + 20}" y2="90" stroke="${getColor(bitB, 'red')}" stroke-width="4" marker-end="${getMarker(bitB, 'red')}" />
+            <circle cx="${cx + 20}" cy="35" r="16" fill="${getColor(bitB, 'red')}" class="cursor-pointer hover:opacity-80 transition-opacity" onclick="toggleB(${i})" />
+            <text x="${cx + 20}" y="41" text-anchor="middle" fill="white" font-size="16" font-weight="bold" class="pointer-events-none">${bitB}</text>
+            <text x="${cx + 20}" y="12" text-anchor="middle" fill="#475569" font-size="14" font-weight="bold">B${i}</text>
+
+            <!-- 输出 P (进入 CLA) -->
+            <line x1="${cx - 20}" y1="160" x2="${cx - 20}" y2="210" stroke="${getColor(pi, 'blue')}" stroke-width="4" marker-end="${getMarker(pi, 'blue')}" />
+            <text x="${cx - 32}" y="190" fill="${getColor(pi, 'blue')}" font-size="14" font-weight="bold">P${i}</text>
+
+            <!-- 输出 G (进入 CLA) -->
+            <line x1="${cx + 20}" y1="160" x2="${cx + 20}" y2="210" stroke="${getColor(gi, 'green')}" stroke-width="4" marker-end="${getMarker(gi, 'green')}" />
+            <text x="${cx + 35}" y="190" fill="${getColor(gi, 'green')}" font-size="14" font-weight="bold">G${i}</text>
+
+            <!-- 第三级：求和器 (S = P XOR C) -->
+            <rect x="${cx - 40}" y="360" width="80" height="50" rx="6" fill="white" stroke="#64748b" stroke-width="2" />
+            <text x="${cx}" y="390" text-anchor="middle" fill="#334155" font-size="16" font-weight="bold">S = P ⊕ C</text>
+
+            <!-- 提取 P 给求和器 (逻辑上相当于P穿过CLA到达求和器) -->
+            <line x1="${cx - 20}" y1="300" x2="${cx - 20}" y2="350" stroke="${getColor(pi, 'blue')}" stroke-width="4" marker-end="${getMarker(pi, 'blue')}" />
+            
+            <!-- CLA 吐出的进位 C 给求和器 -->
+            <line x1="${cx + 20}" y1="300" x2="${cx + 20}" y2="350" stroke="${getColor(ci, 'orange')}" stroke-width="4" marker-end="${getMarker(ci, 'orange')}" />
+            <text x="${cx + 40}" y="335" fill="${getColor(ci, 'orange')}" font-size="14" font-weight="bold">C${i}</text>
+
+            <!-- 最终 Sum 输出 -->
+            <line x1="${cx}" y1="410" x2="${cx}" y2="450" stroke="${getColor(si, 'purple')}" stroke-width="4" marker-end="${getMarker(si, 'purple')}" />
+            <rect x="${cx - 15}" y="460" width="30" height="30" rx="4" fill="${getColor(si, 'purple')}" />
+            <text x="${cx}" y="481" text-anchor="middle" fill="white" font-size="16" font-weight="bold">${si}</text>
+            <text x="${cx}" y="510" text-anchor="middle" fill="#475569" font-size="14" font-weight="bold">S${i}</text>
+          </g>
+        `;
+      }
+
+      // 生成完整的 DOM 结构
+      const appHtml = `
+        <div class="w-full max-w-5xl p-6 bg-white rounded-2xl shadow-xl">
+          <h1 class="text-3xl font-bold text-center mb-2">4位超前进位加法器 (Carry-Lookahead Adder)</h1>
+          <p class="text-center text-slate-500 mb-6">
+            对比之前的串行加法器，注意观察中间的**巨型黑色逻辑块**是如何并行处理信号的。
+          </p>
+
+          <!-- 顶部等式说明与图例 -->
+          <div class="flex flex-wrap justify-center items-center gap-6 mb-6">
+            <div class="flex items-center space-x-4 bg-slate-100 p-3 rounded-lg font-mono text-lg">
+              <div>A: ${a[3]}${a[2]}${a[1]}${a[0]} <span class="text-sm text-slate-500">(${valA_dec})</span></div>
+              <div class="font-bold">+</div>
+              <div>B: ${b[3]}${b[2]}${b[1]}${b[0]} <span class="text-sm text-slate-500">(${valB_dec})</span></div>
+              <div class="font-bold">+${c0 ? ' C0' : ''} =</div>
+              <div class="text-purple-600 font-bold">${c4} ${s[3]}${s[2]}${s[1]}${s[0]} <span class="text-sm text-slate-500">(${valS_dec})</span></div>
+            </div>
+
+            <div class="flex space-x-4 text-sm bg-white border border-slate-200 p-3 rounded-lg shadow-sm">
+              <div class="flex items-center"><div class="w-3 h-3 rounded-full bg-red-500 mr-2"></div>输入 (A/B)</div>
+              <div class="flex items-center"><div class="w-3 h-3 rounded-full bg-blue-500 mr-2"></div>传播 (P)</div>
+              <div class="flex items-center"><div class="w-3 h-3 rounded-full bg-emerald-500 mr-2"></div>生成 (G)</div>
+              <div class="flex items-center"><div class="w-3 h-3 rounded-full bg-amber-500 mr-2"></div>进位 (C)</div>
+            </div>
+          </div>
+
+          <!-- 核心 SVG 渲染区 -->
+          <div class="overflow-x-auto w-full flex justify-center border border-slate-200 rounded-xl bg-slate-50 py-4">
+            <svg width="900" height="520" viewBox="0 0 900 520" class="select-none">
+              <defs>
+                <marker id="arrowGray" markerWidth="8" markerHeight="8" refX="8" refY="4" orient="auto"><polygon points="0 0, 8 4, 0 8" fill="${colors.gray}" /></marker>
+                <marker id="arrowred" markerWidth="8" markerHeight="8" refX="8" refY="4" orient="auto"><polygon points="0 0, 8 4, 0 8" fill="${colors.red}" /></marker>
+                <marker id="arrowblue" markerWidth="8" markerHeight="8" refX="8" refY="4" orient="auto"><polygon points="0 0, 8 4, 0 8" fill="${colors.blue}" /></marker>
+                <marker id="arrowgreen" markerWidth="8" markerHeight="8" refX="8" refY="4" orient="auto"><polygon points="0 0, 8 4, 0 8" fill="${colors.green}" /></marker>
+                <marker id="arroworange" markerWidth="8" markerHeight="8" refX="8" refY="4" orient="auto"><polygon points="0 0, 8 4, 0 8" fill="${colors.orange}" /></marker>
+                <marker id="arrowpurple" markerWidth="8" markerHeight="8" refX="8" refY="4" orient="auto"><polygon points="0 0, 8 4, 0 8" fill="${colors.purple}" /></marker>
+              </defs>
+
+              <!-- --- CLA 核心并行网络方块 --- -->
+              <rect x="60" y="220" width="760" height="80" rx="6" fill="#1e293b" />
+              <text x="440" y="265" text-anchor="middle" fill="#94a3b8" font-size="22" font-weight="bold" letter-spacing="2">超前进位逻辑网络 (CLA Logic)</text>
+              <text x="440" y="285" text-anchor="middle" fill="#475569" font-size="12">内部直接计算所有 C(i) = G(i-1) + P(i-1)·C(i-1) ...</text>
+
+              <!-- 初始进位 C0 输入 -->
+              <line x1="880" y1="260" x2="835" y2="260" stroke="${getColor(c0, 'orange')}" stroke-width="4" marker-end="${getMarker(c0, 'orange')}" />
+              <circle cx="880" cy="260" r="16" fill="${getColor(c0, 'orange')}" class="cursor-pointer hover:opacity-80 transition-opacity" onclick="toggleC0()" />
+              <text x="880" y="265" text-anchor="middle" fill="white" font-size="16" font-weight="bold" class="pointer-events-none">${c0}</text>
+              <text x="880" y="235" text-anchor="middle" fill="#475569" font-size="14" font-weight="bold">C0</text>
+
+              <!-- 最终进位 C4 输出 -->
+              <line x1="60" y1="260" x2="25" y2="260" stroke="${getColor(c4, 'orange')}" stroke-width="4" marker-end="${getMarker(c4, 'orange')}" />
+              <rect x="15" y="245" width="30" height="30" rx="4" fill="${getColor(c4, 'orange')}" />
+              <text x="30" y="266" text-anchor="middle" fill="white" font-size="16" font-weight="bold">${c4}</text>
+              <text x="30" y="235" text-anchor="middle" fill="#475569" font-size="14" font-weight="bold">C4</text>
+
+              <!-- 动态生成的 4 个位的连线与逻辑框 -->
+              ${bitsSvgHtml}
+            </svg>
+          </div>
+
+          <!-- 交互说明卡片 -->
+          <div class="mt-8 grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div class="bg-emerald-50 p-5 rounded-xl border border-emerald-100">
+              <h3 class="text-lg font-bold text-emerald-800 mb-2">🟢 测试 "生成" (Generate)</h3>
+              <p class="text-sm text-slate-700 leading-relaxed">
+                把某一位（比如 A1 和 B1）都点成 <strong>1</strong>。<br/>
+                你会看到绿色的 <strong>G1</strong> 信号亮起，直接穿透黑色网络，强制向左侧高位输出了橙色的进位 <strong>C2</strong>，它<strong>不需要</strong>依赖右边传过来的 C1！这就是超前进位最核心的提速点。
+              </p>
+            </div>
+            <div class="bg-blue-50 p-5 rounded-xl border border-blue-100">
+              <h3 class="text-lg font-bold text-blue-800 mb-2">🔵 测试 "传播" (Propagate)</h3>
+              <p class="text-sm text-slate-700 leading-relaxed">
+                把 A 全部设为 <code>1111</code>，B 全部设为 <code>0000</code>。此时所有的 <strong>P</strong> (蓝色) 都亮起。<br/>
+                接着点击右侧最边缘的 <strong>C0</strong> (变成1)，你会发现橙色的进位信号瞬间“瞬移”到了最左边的 <strong>C4</strong>！在真实的电路中，只要 P 准备好了，C0 一进来就会通过逻辑门<strong>同时</strong>到达所有高位，没有任何波纹延迟。
+              </p>
+            </div>
+          </div>
+        </div>
+      `;
+
+      // 渲染到 DOM
+      document.getElementById('app').innerHTML = appHtml;
+    }
+
+    // 初始化首次渲染
+    render();
+  </script>
+</body>
+</html>
