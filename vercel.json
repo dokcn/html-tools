@@ -36,6 +36,10 @@
     {
       "source": "/ds",
       "destination": "/DigitalLogicSymbols.html"
+    },
+    {
+      "source": "/74138",
+      "destination": "/74138译码器.html"
     }
   ]
 }
