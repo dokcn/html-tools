@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>74138 3线-8线译码器运行示意图</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    .overline-text { text-decoration: overline; }
+  </style>
+</head>
+<body class="min-h-screen bg-gray-50 p-4 md:p-8 font-sans">
+  <div class="max-w-6xl mx-auto">
+    <header class="mb-8 text-center">
+      <h1 class="text-3xl font-bold text-gray-800 mb-2">74138 3线-8线译码器运行示意图 (纯JS版)</h1>
+      <p class="text-gray-600">点击左侧的输入引脚按钮 (0/1) 切换电平，观察芯片工作状态及输出。</p>
+    </header>
+
+    <div class="flex flex-col lg:flex-row gap-8 items-start justify-center">
+      
+      <!-- 左侧：芯片可视化 -->
+      <div class="bg-white p-6 rounded-2xl shadow-xl border border-gray-200 w-full lg:w-auto flex flex-col items-center">
+        <h2 class="text-xl font-bold text-gray-700 mb-6 border-b pb-2 w-full text-center">芯片模拟</h2>
+        
+        <div class="flex items-center">
+          <!-- 输入端 -->
+          <div class="flex flex-col justify-between h-[450px] py-4 w-32">
+            <div class="flex flex-col" id="enable-pins">
+              <div class="text-sm text-gray-500 font-bold mb-2 ml-12 text-center">使能端</div>
+              <!-- 引脚通过 JS 动态渲染 -->
+            </div>
+            <div class="flex flex-col mt-4" id="address-pins">
+              <div class="text-sm text-gray-500 font-bold mb-2 ml-12 text-center">地址端</div>
+              <!-- 引脚通过 JS 动态渲染 -->
+            </div>
+          </div>
+
+          <!-- 芯片本体 -->
+          <div class="relative w-48 h-[500px] bg-slate-800 rounded-lg shadow-[inset_0_0_20px_rgba(0,0,0,0.5)] border-4 border-slate-900 flex flex-col items-center justify-center z-10">
+            <div class="absolute top-0 w-8 h-4 bg-slate-900 rounded-b-full"></div> <!-- 芯片缺口方向标 -->
+            <span class="text-white text-3xl font-black tracking-widest opacity-20 rotate-90 transform absolute pointer-events-none">74LS138</span>
+            
+            <!-- 芯片内部逻辑指示 -->
+            <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 flex flex-col items-center w-full px-2" id="chip-status-container">
+              <!-- 状态通过 JS 动态渲染 -->
+            </div>
+          </div>
+
+          <!-- 输出端 -->
+          <div class="flex flex-col justify-around h-[500px] py-4 w-32" id="output-pins">
+            <div class="text-sm text-gray-500 font-bold -mt-6 mb-2 pl-4">输出端 (低电平有效)</div>
+            <!-- 引脚通过 JS 动态渲染 -->
+          </div>
+        </div>
+      </div>
+
+      <!-- 右侧：真值表 -->
+      <div class="bg-white p-6 rounded-2xl shadow-xl border border-gray-200 w-full lg:w-[600px] overflow-x-auto">
+         <h2 class="text-xl font-bold text-gray-700 mb-4 border-b pb-2">功能真值表</h2>
+         <table class="w-full text-center text-sm">
+            <thead>
+              <tr class="bg-gray-100 text-gray-700">
+                <th colspan="3" class="border px-2 py-2">使能输入</th>
+                <th colspan="3" class="border px-2 py-2">数据/地址输入</th>
+                <th colspan="8" class="border px-2 py-2">输 出</th>
+              </tr>
+              <tr class="bg-gray-50 text-gray-600 font-mono">
+                <th class="border px-1 py-1">G1</th>
+                <th class="border px-1 py-1"><span class="overline-text">G2A</span></th>
+                <th class="border px-1 py-1"><span class="overline-text">G2B</span></th>
+                <th class="border px-1 py-1">C</th>
+                <th class="border px-1 py-1">B</th>
+                <th class="border px-1 py-1">A</th>
+                <th class="border px-1 py-1"><span class="overline-text">Y0</span></th>
+                <th class="border px-1 py-1"><span class="overline-text">Y1</span></th>
+                <th class="border px-1 py-1"><span class="overline-text">Y2</span></th>
+                <th class="border px-1 py-1"><span class="overline-text">Y3</span></th>
+                <th class="border px-1 py-1"><span class="overline-text">Y4</span></th>
+                <th class="border px-1 py-1"><span class="overline-text">Y5</span></th>
+                <th class="border px-1 py-1"><span class="overline-text">Y6</span></th>
+                <th class="border px-1 py-1"><span class="overline-text">Y7</span></th>
+              </tr>
+            </thead>
+            <tbody class="font-mono" id="truth-table-body">
+              <!-- 表格行通过 JS 动态渲染 -->
+            </tbody>
+         </table>
+         <div class="mt-4 text-sm text-gray-500">
+            <p><strong>注：</strong></p>
+            <ul class="list-disc pl-5 mt-1 space-y-1">
+              <li><span class="overline-text">上划线</span> 表示低电平（0）有效。</li>
+              <li><strong>X</strong> 代表任意状态（0或1，即 Don't Care）。</li>
+              <li>当前真值表中高亮的行即为您在左侧模拟器中设置的状态。</li>
+            </ul>
+         </div>
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+    // 1. 状态定义
+    const state = {
+      g1: 1,
+      g2a: 0,
+      g2b: 0,
+      c: 0,
+      b: 0,
+      a: 0
+    };
+
+    // 2. 真值表数据
+    const truthTable = [
+      { g1: 0, g2a: 'X', g2b: 'X', c: 'X', b: 'X', a: 'X', y: [1, 1, 1, 1, 1, 1, 1, 1], type: 'disable' },
+      { g1: 'X', g2a: 1, g2b: 'X', c: 'X', b: 'X', a: 'X', y: [1, 1, 1, 1, 1, 1, 1, 1], type: 'disable' },
+      { g1: 'X', g2a: 'X', g2b: 1, c: 'X', b: 'X', a: 'X', y: [1, 1, 1, 1, 1, 1, 1, 1], type: 'disable' },
+      { g1: 1, g2a: 0, g2b: 0, c: 0, b: 0, a: 0, y: [0, 1, 1, 1, 1, 1, 1, 1], type: 'active', val: 0 },
+      { g1: 1, g2a: 0, g2b: 0, c: 0, b: 0, a: 1, y: [1, 0, 1, 1, 1, 1, 1, 1], type: 'active', val: 1 },
+      { g1: 1, g2a: 0, g2b: 0, c: 0, b: 1, a: 0, y: [1, 1, 0, 1, 1, 1, 1, 1], type: 'active', val: 2 },
+      { g1: 1, g2a: 0, g2b: 0, c: 0, b: 1, a: 1, y: [1, 1, 1, 0, 1, 1, 1, 1], type: 'active', val: 3 },
+      { g1: 1, g2a: 0, g2b: 0, c: 1, b: 0, a: 0, y: [1, 1, 1, 1, 0, 1, 1, 1], type: 'active', val: 4 },
+      { g1: 1, g2a: 0, g2b: 0, c: 1, b: 0, a: 1, y: [1, 1, 1, 1, 1, 0, 1, 1], type: 'active', val: 5 },
+      { g1: 1, g2a: 0, g2b: 0, c: 1, b: 1, a: 0, y: [1, 1, 1, 1, 1, 1, 0, 1], type: 'active', val: 6 },
+      { g1: 1, g2a: 0, g2b: 0, c: 1, b: 1, a: 1, y: [1, 1, 1, 1, 1, 1, 1, 0], type: 'active', val: 7 },
+    ];
+
+    // 3. 核心逻辑与辅助函数
+    const isEnabled = () => state.g1 === 1 && state.g2a === 0 && state.g2b === 0;
+    const getAddressValue = () => (state.c << 2) | (state.b << 1) | state.a;
+    
+    const getOutputs = () => {
+      const outputs = Array(8).fill(1);
+      if (isEnabled()) {
+        outputs[getAddressValue()] = 0;
+      }
+      return outputs;
+    };
+
+    const isRowActive = (row) => {
+      if (!isEnabled()) {
+        if (state.g1 === 0 && row.g1 === 0) return true;
+        if (state.g1 === 1 && state.g2a === 1 && row.g2a === 1) return true;
+        if (state.g1 === 1 && state.g2a === 0 && state.g2b === 1 && row.g2b === 1) return true;
+        return false;
+      }
+      return row.type === 'active' && row.val === getAddressValue();
+    };
+
+    // 状态切换入口
+    window.toggleState = (pinName) => {
+      state[pinName] = state[pinName] === 1 ? 0 : 1;
+      renderUI(); // 每次改变状态后重新渲染 UI
+    };
+
+    // 样式辅助函数
+    const getLogicColorClass = (val, isActiveLow = false) => {
+      if (isActiveLow) {
+        return val === 0 ? 'bg-green-500 text-white shadow-[0_0_10px_rgba(34,197,94,0.8)]' : 'bg-gray-300 text-gray-500';
+      }
+      return val === 1 ? 'bg-red-500 text-white shadow-[0_0_10px_rgba(239,68,68,0.8)]' : 'bg-gray-300 text-gray-500';
+    };
+
+    const getOutputColorClass = (val) => {
+      return val === 0 ? 'bg-green-500 text-white shadow-[0_0_15px_rgba(34,197,94,1)] font-bold' : 'bg-gray-700 text-gray-400';
+    };
+
+    // 4. 渲染函数
+    const renderUI = () => {
+      const outputs = getOutputs();
+      const enabled = isEnabled();
+      const addrVal = getAddressValue();
+
+      // 渲染使能端
+      document.getElementById('enable-pins').innerHTML = `
+        <div class="text-sm text-gray-500 font-bold mb-2 ml-12 text-center">使能端</div>
+        ${generatePinHTML('G1', state.g1, 'g1', false)}
+        ${generatePinHTML('G2A', state.g2a, 'g2a', true, true)}
+        ${generatePinHTML('G2B', state.g2b, 'g2b', true, true)}
+      `;
+
+      // 渲染地址端
+      document.getElementById('address-pins').innerHTML = `
+        <div class="text-sm text-gray-500 font-bold mb-2 ml-12 text-center">地址端</div>
+        ${generatePinHTML('C', state.c, 'c')}
+        ${generatePinHTML('B', state.b, 'b')}
+        ${generatePinHTML('A', state.a, 'a')}
+      `;
+
+      // 渲染芯片内部状态
+      let chipStatusHTML = `
+        <div class="px-4 py-2 rounded font-bold text-sm ${enabled ? 'bg-green-500 text-white shadow-[0_0_15px_rgba(34,197,94,0.6)]' : 'bg-red-500 text-white shadow-[0_0_15px_rgba(239,68,68,0.6)]'}">
+          ${enabled ? '工作状态 (Enabled)' : '禁用状态 (Disabled)'}
+        </div>
+      `;
+      if (enabled) {
+        chipStatusHTML += `
+          <div class="mt-4 text-center text-cyan-300 font-mono font-bold text-lg bg-slate-900 p-2 rounded">
+            (${state.c}${state.b}${state.a})₂ = ${addrVal}₁₀<br/>↓<br/>Y${addrVal} = 0
+          </div>
+        `;
+      }
+      document.getElementById('chip-status-container').innerHTML = chipStatusHTML;
+
+      // 渲染输出端
+      let outputPinsHTML = '<div class="text-sm text-gray-500 font-bold -mt-6 mb-2 pl-4">输出端 (低电平有效)</div>';
+      outputs.forEach((val, idx) => {
+        outputPinsHTML += generateOutputPinHTML(idx, val);
+      });
+      document.getElementById('output-pins').innerHTML = outputPinsHTML;
+
+      // 渲染真值表
+      let tbodyHTML = '';
+      truthTable.forEach((row) => {
+        const active = isRowActive(row);
+        const trClass = active 
+          ? 'bg-blue-100 border-2 border-blue-400 font-bold shadow-inner transition-colors duration-200' 
+          : 'hover:bg-gray-50 border-b border-gray-200 text-gray-600 transition-colors duration-200';
+        
+        const textBlueClass = active && row.type === 'active' ? 'text-blue-600' : '';
+
+        let yCellsHTML = '';
+        row.y.forEach(yVal => {
+          yCellsHTML += `<td class="px-1 py-2 ${yVal === 0 ? 'text-green-600 font-black bg-green-100 rounded' : ''}">${yVal}</td>`;
+        });
+
+        tbodyHTML += `
+          <tr class="${trClass}">
+            <td class="px-1 py-2">${row.g1}</td>
+            <td class="px-1 py-2">${row.g2a}</td>
+            <td class="px-1 py-2">${row.g2b}</td>
+            <td class="px-1 py-2 border-l border-gray-300 ${textBlueClass}">${row.c}</td>
+            <td class="px-1 py-2 ${textBlueClass}">${row.b}</td>
+            <td class="px-1 py-2 border-r border-gray-300 ${textBlueClass}">${row.a}</td>
+            ${yCellsHTML}
+          </tr>
+        `;
+      });
+      document.getElementById('truth-table-body').innerHTML = tbodyHTML;
+    };
+
+    // 生成输入引脚的 HTML
+    const generatePinHTML = (label, value, pinName, isActiveLow = false, isBar = false) => {
+      const colorClass = getLogicColorClass(value, isActiveLow);
+      const barHTML = isBar ? '<span class="block w-full h-0.5 bg-gray-700 -mt-5 mb-4"></span>' : '';
+      return `
+        <div class="flex items-center justify-end w-full mb-3 pr-2">
+          <span class="mr-3 font-medium text-gray-700 w-8 text-right">
+            ${label}
+            ${barHTML}
+          </span>
+          <button
+            onclick="toggleState('${pinName}')"
+            class="w-10 h-10 rounded-full flex items-center justify-center font-bold text-lg transition-all duration-200 border-2 border-gray-400 hover:scale-110 active:scale-95 ${colorClass}"
+            title="点击切换电平"
+          >
+            ${value}
+          </button>
+          <div class="w-8 h-1 bg-gray-400 ml-1"></div>
+        </div>
+      `;
+    };
+
+    // 生成输出引脚的 HTML
+    const generateOutputPinHTML = (label, value) => {
+      const lineColorClass = value === 0 ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.8)]' : 'bg-gray-600';
+      const circleColorClass = getOutputColorClass(value);
+      return `
+        <div class="flex items-center justify-start w-full mb-2 pl-2">
+          <div class="w-8 h-1 ${lineColorClass}"></div>
+          <div class="w-10 h-10 rounded-full flex items-center justify-center font-bold text-lg border-2 border-gray-600 transition-colors duration-300 ${circleColorClass}">
+            ${value}
+          </div>
+          <span class="ml-3 font-medium text-gray-700 w-8">
+            Y${label}
+            <span class="block w-full h-0.5 bg-gray-700 -mt-5 mb-4"></span>
+          </span>
+        </div>
+      `;
+    };
+
+    // 5. 初始化：首次加载时渲染界面
+    renderUI();
+
+  </script>
+</body>
+</html>

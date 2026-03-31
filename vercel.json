@@ -30,6 +30,10 @@
       "destination": "/超前进位加法器.html"
     },
     {
+      "source": "/7s",
+      "destination": "/四位数码管段码演示器.html"
+    },
+    {
       "source": "/ds",
       "destination": "/DigitalLogicSymbols.html"
     }

@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>四位数码管段码演示器</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap');
+        body {
+            font-family: 'Inter', -apple-system, sans-serif;
+            background-color: #0f172a;
+            color: #f8fafc;
+        }
+        .font-mono {
+            font-family: 'JetBrains Mono', monospace;
+        }
+        /* 数码管发光效果 */
+        .seg-on {
+            stroke: #ef4444; /* 红色 */
+            fill: #ef4444;
+            filter: drop-shadow(0 0 6px rgba(239, 68, 68, 0.8));
+        }
+        .seg-off {
+            stroke: #1e293b; /* 暗色底 */
+            fill: #1e293b;
+        }
+        /* 避免SVG元素出现奇怪的边框 */
+        svg {
+            outline: none;
+        }
+    </style>
+</head>
+<body class="min-h-screen p-4 md:p-8 flex flex-col items-center">
+
+    <div class="max-w-4xl w-full space-y-8">
+        
+        <!-- 头部信息 -->
+        <div class="text-center space-y-2">
+            <h1 class="text-3xl font-bold text-white tracking-wider">四位数码管段码演示器</h1>
+            <p class="text-slate-400">输入数字或字母 (0-9, A-F) 查看其对应的 7 段数码管亮灭状态及二进制/十六进制编码。</p>
+        </div>
+
+        <!-- 控制面板 -->
+        <div class="bg-slate-800 rounded-xl p-6 shadow-xl border border-slate-700 flex flex-col md:flex-row gap-6 justify-between items-center">
+            <div class="flex-1 w-full">
+                <label for="displayInput" class="block text-sm font-medium text-slate-300 mb-2">
+                    输入显示内容 (支持小数点，如: 12.34 或 ABCD)
+                </label>
+                <input type="text" id="displayInput" value="20.24" maxlength="8"
+                    class="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-3 text-2xl font-mono text-center text-green-400 focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-colors"
+                    placeholder="输入内容...">
+            </div>
+            
+            <div class="flex flex-col gap-3">
+                <label class="block text-sm font-medium text-slate-300">极性设置 (段码映射)</label>
+                <div class="flex items-center gap-4 bg-slate-900 p-2 rounded-lg border border-slate-700">
+                    <label class="flex items-center gap-2 cursor-pointer">
+                        <input type="radio" name="polarity" value="cathode" checked class="text-red-500 focus:ring-red-500 bg-slate-700 border-slate-600">
+                        <span class="text-sm">共阴极 (1亮 0灭)</span>
+                    </label>
+                    <label class="flex items-center gap-2 cursor-pointer">
+                        <input type="radio" name="polarity" value="anode" class="text-red-500 focus:ring-red-500 bg-slate-700 border-slate-600">
+                        <span class="text-sm">共阳极 (0亮 1灭)</span>
+                    </label>
+                </div>
+            </div>
+        </div>
+
+        <!-- 数码管视觉展示区 -->
+        <div class="bg-slate-900 p-8 rounded-xl shadow-2xl border border-slate-800 flex justify-center gap-4 md:gap-8 overflow-hidden">
+            <!-- 我们会用 JS 动态生成 4 个数码管注入到这里 -->
+            <div id="digitContainer" class="flex gap-4 md:gap-8"></div>
+        </div>
+
+        <!-- 数据表格 -->
+        <div class="bg-slate-800 rounded-xl shadow-xl border border-slate-700 overflow-hidden">
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="bg-slate-900 border-b border-slate-700 text-slate-300">
+                            <th class="px-6 py-4 font-semibold text-center">数码管位</th>
+                            <th class="px-6 py-4 font-semibold text-center">字符</th>
+                            <th class="px-6 py-4 font-semibold text-center">段状态 (DP G F E D C B A)</th>
+                            <th class="px-6 py-4 font-semibold text-center">二进制 (Binary)</th>
+                            <th class="px-6 py-4 font-semibold text-center text-red-400">十六进制 (Hex)</th>
+                        </tr>
+                    </thead>
+                    <tbody id="dataTableBody" class="font-mono text-sm divide-y divide-slate-700">
+                        <!-- 表格内容由 JS 动态生成 -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        
+    </div>
+
+    <script>
+        // ----------------------------------------------------
+        // 核心数据：共阴极字模字典 (1: 亮, 0: 灭)
+        // 位序为: DP, G, F, E, D, C, B, A  (A是最低位 Bit 0)
+        // ----------------------------------------------------
+        const CHAR_MAP = {
+            '0': 0x3F, // 0011 1111
+            '1': 0x06, // 0000 0110
+            '2': 0x5B, // 0101 1011
+            '3': 0x4F, // 0100 1111
+            '4': 0x66, // 0110 0110
+            '5': 0x6D, // 0110 1101
+            '6': 0x7D, // 0111 1101
+            '7': 0x07, // 0000 0111
+            '8': 0x7F, // 0111 1111
+            '9': 0x6F, // 0110 1111
+            'A': 0x77, // 0111 0111
+            'B': 0x7C, // 0111 1100 (小写 b)
+            'C': 0x39, // 0011 1001
+            'D': 0x5E, // 0101 1110 (小写 d)
+            'E': 0x79, // 0111 1001
+            'F': 0x71, // 0111 0001
+            '-': 0x40, // 0100 0000 (仅G段)
+            ' ': 0x00, // 0000 0000 (全灭)
+            '_': 0x08  // 0000 1000 (仅D段)
+        };
+
+        // DOM 元素引用
+        const displayInput = document.getElementById('displayInput');
+        const polarityRadios = document.getElementsByName('polarity');
+        const digitContainer = document.getElementById('digitContainer');
+        const dataTableBody = document.getElementById('dataTableBody');
+
+        // 初始化：绘制4个数码管的 SVG
+        function renderEmptyDigits() {
+            digitContainer.innerHTML = '';
+            for (let i = 0; i < 4; i++) {
+                // 每个数码管的SVG结构
+                const svgHTML = `
+                <div class="relative w-16 h-28 md:w-24 md:h-40 bg-black/40 rounded-lg p-2 md:p-3 border border-slate-700/50">
+                    <svg viewBox="0 0 70 110" class="w-full h-full">
+                        <g stroke-width="7" stroke-linecap="round" fill="none">
+                            <!-- 各个线段，赋予id以便后续通过JS控制颜色类 -->
+                            <line id="seg-${i}-a" x1="20" y1="10" x2="50" y2="10" class="seg-off transition-all duration-150" />
+                            <line id="seg-${i}-b" x1="60" y1="20" x2="60" y2="45" class="seg-off transition-all duration-150" />
+                            <line id="seg-${i}-c" x1="60" y1="65" x2="60" y2="90" class="seg-off transition-all duration-150" />
+                            <line id="seg-${i}-d" x1="20" y1="100" x2="50" y2="100" class="seg-off transition-all duration-150" />
+                            <line id="seg-${i}-e" x1="10" y1="65" x2="10" y2="90" class="seg-off transition-all duration-150" />
+                            <line id="seg-${i}-f" x1="10" y1="20" x2="10" y2="45" class="seg-off transition-all duration-150" />
+                            <line id="seg-${i}-g" x1="20" y1="55" x2="50" y2="55" class="seg-off transition-all duration-150" />
+                            <!-- 小数点 DP, 使用circle以便实心填充 -->
+                            <circle id="seg-${i}-dp" cx="65" cy="100" r="4.5" stroke-width="0" class="seg-off transition-all duration-150" />
+                        </g>
+                    </svg>
+                </div>`;
+                digitContainer.insertAdjacentHTML('beforeend', svgHTML);
+            }
+        }
+
+        // 解析输入字符串 (处理连着的小数点，例如将 "1.2.3.4" 解析为4个带小数点的数字)
+        function parseInput(str) {
+            let digits = [];
+            for (let i = 0; i < str.length; i++) {
+                let char = str[i].toUpperCase();
+                
+                // 如果是小数点且前面已经有字符，就把小数点挂载到前一个字符上
+                if (char === '.' && digits.length > 0) {
+                    digits[digits.length - 1].dp = true;
+                } else if (char !== '.') {
+                    // 如果超过4个有效显示位则停止解析
+                    if (digits.length < 4) {
+                        digits.push({ char: char, dp: false });
+                    }
+                }
+            }
+            
+            // 补齐到4位 (如果输入不够长)
+            while (digits.length < 4) {
+                digits.push({ char: ' ', dp: false });
+            }
+            return digits;
+        }
+
+        // 核心更新逻辑
+        function updateDisplay() {
+            // 1. 获取输入并解析
+            const rawStr = displayInput.value;
+            const parsedDigits = parseInput(rawStr);
+            
+            // 2. 获取极性 (阴极/阳极)
+            const isCommonAnode = document.querySelector('input[name="polarity"]:checked').value === 'anode';
+
+            // 3. 清空表格
+            dataTableBody.innerHTML = '';
+
+            // 4. 遍历并渲染
+            parsedDigits.forEach((digitInfo, index) => {
+                let char = digitInfo.char;
+                let dp = digitInfo.dp;
+                
+                // 获取基础段码（共阴极），如果找不到字模则全灭
+                let baseCode = CHAR_MAP[char] !== undefined ? CHAR_MAP[char] : 0x00;
+                
+                // 如果有小数点，Bit 7 设为 1 (与 0x80 做按位或)
+                if (dp) {
+                    baseCode = baseCode | 0x80;
+                }
+
+                // 计算最终要展示的二进制数 (应用共阳极逻辑：按位取反)
+                let finalCode = baseCode;
+                if (isCommonAnode) {
+                    finalCode = (~baseCode) & 0xFF; // 取反并保留最低8位
+                }
+
+                // 将最终代码拆分为数组便于控制每一段 [A, B, C, D, E, F, G, DP]
+                // 判断逻辑依然使用baseCode (1代表该段物理点亮)
+                const isSegmentOn = {
+                    a: (baseCode & 0x01) !== 0,
+                    b: (baseCode & 0x02) !== 0,
+                    c: (baseCode & 0x04) !== 0,
+                    d: (baseCode & 0x08) !== 0,
+                    e: (baseCode & 0x10) !== 0,
+                    f: (baseCode & 0x20) !== 0,
+                    g: (baseCode & 0x40) !== 0,
+                    dp: (baseCode & 0x80) !== 0,
+                };
+
+                // 更新 SVG 视图
+                for (let segName in isSegmentOn) {
+                    const el = document.getElementById(`seg-${index}-${segName}`);
+                    if (el) {
+                        if (isSegmentOn[segName]) {
+                            el.classList.remove('seg-off');
+                            el.classList.add('seg-on');
+                        } else {
+                            el.classList.remove('seg-on');
+                            el.classList.add('seg-off');
+                        }
+                    }
+                }
+
+                // 格式化数据以插入表格
+                const binStr = finalCode.toString(2).padStart(8, '0');
+                // 增加空格以便阅读：DP G F E  D C B A
+                const formattedBin = binStr.substring(0,4) + ' ' + binStr.substring(4,8); 
+                const hexStr = '0x' + finalCode.toString(16).toUpperCase().padStart(2, '0');
+                
+                const charDisplay = char === ' ' ? '(空)' : char + (dp ? '.' : '');
+                
+                // 段状态文本可视化 (1为高电平/0为低电平)
+                // binStr本身已经是最终输出的0/1字符串了，最高位是DP，最低位是A
+                let bitsHTML = '';
+                for(let i=0; i<8; i++){
+                    let bitVal = binStr[i];
+                    let bitColor = bitVal === '1' ? 'text-green-400 font-bold' : 'text-slate-500';
+                    bitsHTML += `<span class="${bitColor}">${bitVal}</span> `;
+                }
+
+                // 注入表格行
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-slate-700/50 transition-colors";
+                tr.innerHTML = `
+                    <td class="px-6 py-4 text-center">Digit ${index + 1}</td>
+                    <td class="px-6 py-4 text-center text-white text-lg">${charDisplay}</td>
+                    <td class="px-6 py-4 text-center tracking-widest">${bitsHTML}</td>
+                    <td class="px-6 py-4 text-center text-blue-300">0b${formattedBin}</td>
+                    <td class="px-6 py-4 text-center text-red-400 font-bold">${hexStr}</td>
+                `;
+                dataTableBody.appendChild(tr);
+            });
+        }
+
+        // 绑定事件监听
+        displayInput.addEventListener('input', updateDisplay);
+        polarityRadios.forEach(radio => radio.addEventListener('change', updateDisplay));
+
+        // 初始渲染
+        renderEmptyDigits();
+        updateDisplay();
+    </script>
+</body>
+</html>
