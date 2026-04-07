@@ -38,6 +38,10 @@
       "destination": "/DigitalLogicSymbols.html"
     },
     {
+      "source": "/law",
+      "destination": "/逻辑代数基本定律.html"
+    },
+    {
       "source": "/74138",
       "destination": "/74138译码器.html"
     }

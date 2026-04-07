@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>Markdown 公式渲染示例</title>
+    
+    <!-- 1. 引入 KaTeX 的样式文件 (负责公式的长相) -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+    
+    <!-- 2. 引入 marked.js (负责解析 Markdown 文本) -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    
+    <!-- 3. 引入 KaTeX 的核心脚本 -->
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+    
+    <!-- 4. 引入 auto-render 插件 (自动查找页面中的公式并渲染) -->
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+
+    <style>
+        body { font-family: sans-serif; max-width: 800px; margin: 40px auto; padding: 20px; line-height: 1.6; }
+        /* 让行内公式不换行 */
+        .katex { font-size: 1.1em; }
+    </style>
+</head>
+<body>
+    <div id="content"></div>
+
+    <script>
+        // 你的 Markdown 内容
+        const markdownText = `
+我为你整理了一份逻辑代数基本定律清单，这是考试中最常考、最实用的部分：
+
+## 1. 基础公理（最直观的）
+
+• 0−1律（与0或1运算）：
+
+-  $A \\cdot 0 = 0$
+
+-  $A + 1 = 1$
+
+-  $A \\cdot 1 = A$
+
+-  $A + 0 = A$
+
+• 互补律（变量与其反变量）：
+
+-  $A + \\overline{A} = 1$
+
+-  $A \\cdot \\overline{A} = 0$
+
+• 重叠律（幂等律）：
+
+-  $A + A = A$
+
+-  $A \\cdot A = A$
+
+## 2. 常用运算定律
+
+• 交换律： $A + B = B + A$； $A \\cdot B = B \\cdot A$
+
+• 结合律： $(A+B)+C=A+(B+C)$；  $(A\\cdot B)\\cdot C=A\\cdot(B\\cdot C)$
+
+• 分配律（注意第二条，这和普通代数不同！）：
+
+1.  $A \\cdot (B + C) = A \\cdot B + A \\cdot C$
+
+2.  $A + (B \\cdot C) = (A + B) \\cdot (A + C)$ （这个在化简时非常有用，很多人容易忘）
+
+## 3. 进阶核心定律（大题必考）
+
+- 反演律（摩根定律/De Morgan's Laws）：
+
+    *  $\\overline{A + B} = \\overline{A} \\cdot \\overline{B}$（“或”变“与”，长杠变短杠）
+
+    *  $\\overline{A \\cdot B} = \\overline{A} + \\overline{B}$（“与”变“或”，长杠变短杠）
+
+- 还原律（双重否定律）： $\\overline{\\overline{A}}=A$
+
+- 吸收律（化简长表达式的神器）：
+
+    1.  $A + A \\cdot B = A$ （A 把整个  $A \\cdot B$ 吸收了）
+
+    2.  $A \\cdot (A + B) = A$
+
+    3.  $A + \\overline{A} \\cdot B = A + B$ （这个最常考，可以理解为  $\\overline{A}$ 被 A 抵消了）
+
+    4.  $A \\cdot B + \\overline{A} \\cdot C + B \\cdot C = A \\cdot B + \\overline{A} \\cdot C$ （冗余项定律：如果两项分别包含 A 和  $\\overline{A}$，且剩余部分 B 和 C 组成了第三项，则第三项是多余的）
+        `; 
+        
+        // 第一步：使用 marked 将 Markdown 转换为 HTML 字符串
+        const htmlContent = marked.parse(markdownText);
+        
+        // 第二步：将 HTML 放入页面
+        const contentDiv = document.getElementById('content');
+        contentDiv.innerHTML = htmlContent;
+
+        // 第三步：关键步骤！调用 KaTeX 的 autoRender 功能
+        // 它会扫描页面，把所有 $...$ 和 $$...$$ 包裹的内容变成漂亮的公式
+        renderMathInElement(contentDiv, {
+            delimiters: [
+                {left: '$$', right: '$$', display: true}, // 块级公式
+                {left: '$', right: '$', display: false},  // 行内公式
+                {left: '\\(', right: '\\)', display: false},
+                {left: '\\[', right: '\\]', display: true}
+            ],
+            throwOnError: false // 遇到错误不中断页面
+        });
+    </script>
+</body>
+</html>
