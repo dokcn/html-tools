@@ -42,6 +42,10 @@
       "destination": "/逻辑代数基本定律.html"
     },
     {
+      "source": "/attitude",
+      "destination": "/pitch_roll_yaw.html"
+    },
+    {
       "source": "/74138",
       "destination": "/74138译码器.html"
     }

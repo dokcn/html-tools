@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D 姿态演示 (Pitch, Roll, Yaw)</title>
+    <!-- 引入 Tailwind CSS 用于快速构建美观的 UI -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 引入 Three.js 用于 3D 渲染 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #1a202c; color: white; font-family: sans-serif; }
+        #canvas-container { position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 1; }
+        #ui-panel { 
+            position: absolute; 
+            top: 20px; 
+            right: 20px; 
+            width: 320px; 
+            z-index: 10; 
+            background: rgba(30, 41, 59, 0.85); 
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        /* 自定义滑动条样式 */
+        input[type=range] {
+            -webkit-appearance: none;
+            width: 100%;
+            background: transparent;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 16px;
+            width: 16px;
+            border-radius: 50%;
+            background: #3b82f6;
+            cursor: pointer;
+            margin-top: -6px;
+            box-shadow: 0 0 5px rgba(0,0,0,0.5);
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 4px;
+            cursor: pointer;
+            background: #475569;
+            border-radius: 2px;
+        }
+        input[type=range]:focus { outline: none; }
+        
+        .axis-label { position: absolute; color: white; font-weight: bold; font-size: 14px; text-shadow: 1px 1px 2px black; pointer-events: none; z-index: 5;}
+    </style>
+</head>
+<body>
+
+    <!-- 3D 渲染容器 -->
+    <div id="canvas-container"></div>
+
+    <!-- UI 控制面板 -->
+    <div id="ui-panel" class="rounded-xl shadow-2xl p-6 flex flex-col gap-4">
+        <div>
+            <h1 class="text-xl font-bold text-white mb-1">姿态角演示</h1>
+            <p class="text-xs text-gray-400">控制下方滑块，观察飞机模型的姿态变化。</p>
+        </div>
+
+        <div class="space-y-5 mt-2">
+            <!-- 俯仰 (Pitch) 控制 -->
+            <div class="control-group">
+                <div class="flex justify-between items-center mb-1">
+                    <label class="text-sm font-medium text-red-400">俯仰 (Pitch) - X轴</label>
+                    <span id="pitch-val" class="text-sm font-mono bg-gray-800 px-2 py-1 rounded">0°</span>
+                </div>
+                <input type="range" id="pitch-slider" min="-90" max="90" value="0" step="1">
+                <div class="flex justify-between text-xs text-gray-500 mt-1">
+                    <span>低头 (-90°)</span>
+                    <span>抬头 (90°)</span>
+                </div>
+            </div>
+
+            <!-- 横滚 (Roll) 控制 -->
+            <div class="control-group">
+                <div class="flex justify-between items-center mb-1">
+                    <label class="text-sm font-medium text-blue-400">横滚 (Roll) - Z轴</label>
+                    <span id="roll-val" class="text-sm font-mono bg-gray-800 px-2 py-1 rounded">0°</span>
+                </div>
+                <input type="range" id="roll-slider" min="-180" max="180" value="0" step="1">
+                <div class="flex justify-between text-xs text-gray-500 mt-1">
+                    <span>左倾 (-180°)</span>
+                    <span>右倾 (180°)</span>
+                </div>
+            </div>
+
+            <!-- 偏航 (Yaw) 控制 -->
+            <div class="control-group">
+                <div class="flex justify-between items-center mb-1">
+                    <label class="text-sm font-medium text-green-400">偏航 (Yaw) - Y轴</label>
+                    <span id="yaw-val" class="text-sm font-mono bg-gray-800 px-2 py-1 rounded">0°</span>
+                </div>
+                <input type="range" id="yaw-slider" min="-180" max="180" value="0" step="1">
+                <div class="flex justify-between text-xs text-gray-500 mt-1">
+                    <span>右转 (-180°)</span>
+                    <span>左转 (180°)</span>
+                </div>
+            </div>
+        </div>
+
+        <button id="reset-btn" class="mt-4 w-full bg-slate-700 hover:bg-slate-600 text-white font-semibold py-2 px-4 rounded transition-colors duration-200">
+            重置所有角度
+        </button>
+    </div>
+
+    <!-- 屏幕上的坐标轴标签 -->
+    <div id="label-x" class="axis-label text-red-400">X (Pitch)</div>
+    <div id="label-y" class="axis-label text-green-400">Y (Yaw)</div>
+    <div id="label-z" class="axis-label text-blue-400">Z (Roll)</div>
+
+    <script>
+        // --- 1. Three.js 场景初始化 ---
+        const container = document.getElementById('canvas-container');
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x1e293b); // 深灰蓝色背景
+
+        // 相机设置 (固定视角，以便更清晰地观察相对坐标系的旋转)
+        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
+        camera.position.set(15, 10, 15);
+        camera.lookAt(0, 0, 0);
+
+        // 渲染器设置
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(window.devicePixelRatio);
+        // 开启阴影
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        container.appendChild(renderer.domElement);
+
+        // --- 2. 灯光设置 ---
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.6); // 环境光
+        scene.add(ambientLight);
+
+        const dirLight = new THREE.DirectionalLight(0xffffff, 0.8); // 平行光 (模拟太阳)
+        dirLight.position.set(10, 20, 10);
+        dirLight.castShadow = true;
+        dirLight.shadow.camera.top = 10;
+        dirLight.shadow.camera.bottom = -10;
+        dirLight.shadow.camera.left = -10;
+        dirLight.shadow.camera.right = 10;
+        scene.add(dirLight);
+
+        // --- 3. 辅助工具 (坐标轴和网格) ---
+        // 网格地面
+        const gridHelper = new THREE.GridHelper(20, 20, 0x475569, 0x334155);
+        gridHelper.position.y = -3;
+        scene.add(gridHelper);
+
+        // 坐标轴 (红色X, 绿色Y, 蓝色Z)
+        const axesHelper = new THREE.AxesHelper(8);
+        scene.add(axesHelper);
+
+        // --- 4. 构建飞机模型 ---
+        const planeGroup = new THREE.Group();
+        
+        // 材质定义
+        const bodyMat = new THREE.MeshStandardMaterial({ color: 0xe2e8f0, roughness: 0.3, metalness: 0.2 }); // 机身白
+        const wingMat = new THREE.MeshStandardMaterial({ color: 0x3b82f6, roughness: 0.3, metalness: 0.2 }); // 机翼蓝
+        const noseMat = new THREE.MeshStandardMaterial({ color: 0xef4444, roughness: 0.3, metalness: 0.2 }); // 机头红
+        const windowMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.1, metalness: 0.8 }); // 窗户黑
+
+        // a. 机身 (圆柱体，沿着 Z 轴)
+        const fuselageGeom = new THREE.CylinderGeometry(0.8, 0.8, 6, 32);
+        fuselageGeom.rotateX(Math.PI / 2); // 旋转使其平行于 Z 轴
+        const fuselage = new THREE.Mesh(fuselageGeom, bodyMat);
+        fuselage.castShadow = true;
+        planeGroup.add(fuselage);
+
+        // b. 机头 (圆锥体)
+        const noseGeom = new THREE.ConeGeometry(0.8, 1.5, 32);
+        noseGeom.rotateX(Math.PI / 2);
+        const nose = new THREE.Mesh(noseGeom, noseMat);
+        nose.position.z = 3.75; // 放在机身前面
+        nose.castShadow = true;
+        planeGroup.add(nose);
+
+        // c. 驾驶舱玻璃
+        const cockpitGeom = new THREE.BoxGeometry(1, 0.5, 1);
+        const cockpit = new THREE.Mesh(cockpitGeom, windowMat);
+        cockpit.position.set(0, 0.6, 2.5);
+        cockpit.rotation.x = Math.PI / 6;
+        planeGroup.add(cockpit);
+
+        // d. 主机翼 (长方体)
+        const mainWingGeom = new THREE.BoxGeometry(8, 0.2, 1.5);
+        const mainWing = new THREE.Mesh(mainWingGeom, wingMat);
+        mainWing.position.set(0, 0, 0.5);
+        mainWing.castShadow = true;
+        planeGroup.add(mainWing);
+
+        // e. 尾翼 (水平)
+        const tailWingGeom = new THREE.BoxGeometry(3, 0.2, 1);
+        const tailWing = new THREE.Mesh(tailWingGeom, wingMat);
+        tailWing.position.set(0, 0, -2.5);
+        tailWing.castShadow = true;
+        planeGroup.add(tailWing);
+
+        // f. 垂直尾翼
+        const vertWingGeom = new THREE.BoxGeometry(0.2, 1.5, 1);
+        const vertWing = new THREE.Mesh(vertWingGeom, wingMat);
+        vertWing.position.set(0, 0.85, -2.5);
+        vertWing.castShadow = true;
+        planeGroup.add(vertWing);
+
+        // 调整初始朝向：让飞机机头朝向 +Z 轴 (由于Three.js默认看向-Z，我们把它摆正)
+        // 使用 YXZ 顺序，这在飞行力学中很常见 (Yaw, Pitch, Roll)，可减少万向节死锁的影响
+        planeGroup.rotation.order = 'YXZ'; 
+        scene.add(planeGroup);
+
+
+        // --- 5. UI 交互与逻辑 ---
+        const pitchSlider = document.getElementById('pitch-slider');
+        const rollSlider = document.getElementById('roll-slider');
+        const yawSlider = document.getElementById('yaw-slider');
+        
+        const pitchVal = document.getElementById('pitch-val');
+        const rollVal = document.getElementById('roll-val');
+        const yawVal = document.getElementById('yaw-val');
+
+        const resetBtn = document.getElementById('reset-btn');
+
+        // 更新飞机姿态的函数
+        function updateAttitude() {
+            // 获取角度并转换为弧度
+            // 注意：为了让滑块滑动方向更符合直觉
+            // Pitch: 抬头为正 (绕X轴正方向旋转实际上是低头，所以加负号)
+            const pitchDeg = parseFloat(pitchSlider.value);
+            const pitchRad = THREE.MathUtils.degToRad(pitchDeg);
+            
+            // Roll: 右倾为正 (绕Z轴逆时针是左倾，顺时针是右倾，加负号使右倾为正)
+            const rollDeg = parseFloat(rollSlider.value);
+            const rollRad = THREE.MathUtils.degToRad(-rollDeg);
+
+            // Yaw: 左转为正 (绕Y轴逆时针旋转是左转，符号为正)
+            const yawDeg = parseFloat(yawSlider.value);
+            const yawRad = THREE.MathUtils.degToRad(yawDeg);
+
+            // 应用旋转
+            planeGroup.rotation.x = pitchRad;
+            planeGroup.rotation.y = yawRad;
+            planeGroup.rotation.z = rollRad;
+
+            // 更新 UI 文本显示
+            pitchVal.innerText = pitchDeg + '°';
+            rollVal.innerText = rollDeg + '°';
+            yawVal.innerText = yawDeg + '°';
+        }
+
+        // 监听滑块事件
+        pitchSlider.addEventListener('input', updateAttitude);
+        rollSlider.addEventListener('input', updateAttitude);
+        yawSlider.addEventListener('input', updateAttitude);
+
+        // 重置按钮逻辑
+        resetBtn.addEventListener('click', () => {
+            pitchSlider.value = 0;
+            rollSlider.value = 0;
+            yawSlider.value = 0;
+            updateAttitude();
+        });
+
+
+        // --- 6. 3D 坐标轴标签的 2D 投影 ---
+        const labelX = document.getElementById('label-x');
+        const labelY = document.getElementById('label-y');
+        const labelZ = document.getElementById('label-z');
+
+        function updateLabels() {
+            // 定义坐标轴末端的3D位置
+            const posZ = new THREE.Vector3(0, 0, 8.5); // Z轴 (Roll)
+            const posX = new THREE.Vector3(8.5, 0, 0); // X轴 (Pitch)
+            const posY = new THREE.Vector3(0, 8.5, 0); // Y轴 (Yaw)
+
+            // 投影到 2D 屏幕坐标
+            posZ.project(camera);
+            posX.project(camera);
+            posY.project(camera);
+
+            const widthHalf = window.innerWidth / 2;
+            const heightHalf = window.innerHeight / 2;
+
+            labelX.style.left = (posX.x * widthHalf + widthHalf) + 'px';
+            labelX.style.top = (-(posX.y * heightHalf) + heightHalf) + 'px';
+
+            labelY.style.left = (posY.x * widthHalf + widthHalf) + 'px';
+            labelY.style.top = (-(posY.y * heightHalf) + heightHalf) + 'px';
+
+            labelZ.style.left = (posZ.x * widthHalf + widthHalf) + 'px';
+            labelZ.style.top = (-(posZ.y * heightHalf) + heightHalf) + 'px';
+        }
+
+        // --- 7. 动画循环与窗口自适应 ---
+        function animate() {
+            requestAnimationFrame(animate);
+            updateLabels(); // 实时更新标签位置
+            renderer.render(scene, camera);
+        }
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        // 启动动画
+        window.onload = () => {
+            updateAttitude();
+            animate();
+        };
+
+    </script>
+</body>
+</html>
